@@ -1,0 +1,51 @@
+services:
+  app:
+    image: ${CLASS_GIT_FORGE_APP_IMAGE:?Run scripts/dev init first}
+    build:
+      context: .
+      dockerfile: docker/dev/app.Dockerfile
+      args:
+        APP_UID: ${CLASS_GIT_FORGE_UID:-10001}
+        APP_GID: ${CLASS_GIT_FORGE_GID:-10001}
+      labels:
+        com.class-git-forge.repo: class-git-forge
+        com.class-git-forge.dev: "true"
+        com.class-git-forge.service: app
+    env_file:
+      - .env
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /workspace
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8080
+      DATA_DIR: /workspace/data
+    working_dir: /workspace
+    command: python -m app.main
+    ports:
+      - "127.0.0.1:${CLASS_GIT_FORGE_APP_PORT:?Run scripts/dev init first}:8080"
+    volumes:
+      - .:/workspace
+      - ./data:/workspace/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    labels:
+      com.class-git-forge.repo: class-git-forge
+      com.class-git-forge.dev: "true"
+      com.class-git-forge.service: app
+
+networks:
+  default:
+    labels:
+      com.class-git-forge.repo: class-git-forge
+      com.class-git-forge.dev: "true"

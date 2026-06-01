@@ -1,0 +1,32 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environments
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+
+# Docker local state
+.docker/local.env
+
+# Generated app state
+data/*
+!data/.gitkeep
+!data/uploads/
+!data/uploads/.gitkeep
+!data/reports/
+!data/reports/.gitkeep
+!data/logs/
+!data/logs/.gitkeep

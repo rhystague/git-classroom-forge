@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Class Git Forge</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+      }
+
+      body {
+        margin: 0;
+        background: #f6f7f9;
+        color: #1f2933;
+      }
+
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 32px 20px;
+      }
+
+      form,
+      section {
+        background: #ffffff;
+        border: 1px solid #d8dee8;
+        border-radius: 6px;
+        padding: 20px;
+        margin-top: 20px;
+      }
+
+      label {
+        display: block;
+        font-weight: 700;
+        margin-top: 14px;
+      }
+
+      input,
+      select,
+      button {
+        box-sizing: border-box;
+        display: block;
+        width: 100%;
+        margin-top: 6px;
+        padding: 10px 12px;
+        font: inherit;
+      }
+
+      button {
+        width: auto;
+        margin-top: 18px;
+        border: 0;
+        border-radius: 4px;
+        background: #14532d;
+        color: #ffffff;
+        cursor: pointer;
+      }
+
+      pre {
+        overflow: auto;
+        padding: 16px;
+        background: #111827;
+        color: #f9fafb;
+        border-radius: 4px;
+      }
+
+      .error {
+        border-color: #b91c1c;
+        color: #7f1d1d;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Class Git Forge</h1>
+      <p>Validate GitLab course repository CSV files before provisioning.</p>
+
+      <form action="/validate" method="post" enctype="multipart/form-data">
+        <label for="parent_group_path">Parent group path</label>
+        <input id="parent_group_path" name="parent_group_path" placeholder="professional-experience/autumn-2026">
+
+        <label for="assignment_code">Assignment code</label>
+        <input id="assignment_code" name="assignment_code" placeholder="PA2621">
+
+        <label for="generation_mode">Generation mode</label>
+        <select id="generation_mode" name="generation_mode">
+          <option value="blank">Blank projects</option>
+          <option value="fork">Fork from template</option>
+        </select>
+
+        <label for="csv_file">CSV file</label>
+        <input id="csv_file" name="csv_file" type="file" accept=".csv,text/csv" required>
+
+        <button type="submit">Validate</button>
+      </form>
+
+      {% if error %}
+        <section class="error">
+          <h2>Validation error</h2>
+          <p>{{ error }}</p>
+        </section>
+      {% endif %}
+
+      {% if result %}
+        <section>
+          <h2>Validation result</h2>
+          <p>Status: {{ "valid" if result.valid else "invalid" }}</p>
+          <p>Projects: {{ result.project_count }}</p>
+          <p>Student memberships: {{ result.student_count }}</p>
+          <pre>{{ result | tojson(indent=2) }}</pre>
+        </section>
+      {% endif %}
+    </main>
+  </body>
+</html>
