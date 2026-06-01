@@ -26,7 +26,7 @@ class AppConfig:
             data_dir=source.get("DATA_DIR", "/workspace/data").strip() or "/workspace/data",
         )
 
-    def to_public_dict(self) -> dict[str, str | int]:
+    def to_public_dict(self) -> dict[str, object]:
         return {
             "gitlab_url": self.gitlab_url,
             "gitlab_token": "[redacted]" if self.gitlab_token else "",

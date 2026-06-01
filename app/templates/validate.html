@@ -71,6 +71,62 @@
         border-color: #b91c1c;
         color: #7f1d1d;
       }
+
+      .muted {
+        color: #52606d;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .group-list {
+        padding-left: 20px;
+      }
+
+      .status-list {
+        margin: 10px 0 0;
+        padding-left: 20px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .course-select {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: #14532d;
+        cursor: pointer;
+        display: inline;
+        font: inherit;
+        font-weight: 700;
+        margin: 0;
+        padding: 0;
+        text-align: left;
+        width: auto;
+      }
+
+      .course-select:hover,
+      .course-select:focus {
+        text-decoration: underline;
+      }
+
+      .course-actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      input[readonly] {
+        background: #eef2f7;
+        color: #1f2933;
+      }
     </style>
   </head>
   <body>
@@ -78,23 +134,86 @@
       <h1>Class Git Forge</h1>
       <p>Validate GitLab course repository CSV files before provisioning.</p>
 
-      <form action="/validate" method="post" enctype="multipart/form-data">
-        <label for="parent_group_path">Parent group path</label>
-        <input id="parent_group_path" name="parent_group_path" placeholder="professional-experience/autumn-2026">
+      {% if browse_error %}
+        <section class="error">
+          <h2>GitLab browse unavailable</h2>
+          <p>{{ browse_error }}</p>
+        </section>
+      {% endif %}
 
-        <label for="assignment_code">Assignment code</label>
-        <input id="assignment_code" name="assignment_code" placeholder="PA2621">
+      <section>
+        <h2>Select your course</h2>
+        <p id="group_status" class="muted">
+          {% if config.gitlab_configured %}
+            Loading existing GitLab course groups...
+          {% else %}
+            Set GITLAB_URL and GITLAB_TOKEN before loading existing course groups.
+          {% endif %}
+        </p>
+        <ul id="course_group_list" class="group-list"></ul>
+        <div class="course-actions">
+          <button id="create_new_course" type="button">Create new course</button>
+        </div>
+        {% if config.gitlab_configured %}
+          <p class="muted">Choose an existing course or create a new course path.</p>
+        {% endif %}
+      </section>
 
-        <label for="generation_mode">Generation mode</label>
-        <select id="generation_mode" name="generation_mode">
-          <option value="blank">Blank projects</option>
-          <option value="fork">Fork from template</option>
-        </select>
+      <form action="/dry-run" method="post" enctype="multipart/form-data">
+        <h2>Dry-run assessment provisioning</h2>
+        <label for="selected_course_display">Selected course</label>
+        <input id="selected_course_display" readonly value="No course selected">
+        <input id="parent_group_path" name="parent_group_path" type="hidden">
+
+        <div id="new_course_fields" class="hidden">
+          <label for="new_course_path">New course path</label>
+          <input id="new_course_path" placeholder="professional-experience">
+        </div>
+
+        <div class="grid">
+          <div>
+            <label for="existing_offering_full_path">Existing offering</label>
+            <select id="existing_offering_full_path" name="existing_offering_full_path">
+              <option value="">Create or reuse offering path below</option>
+              {% for course in course_groups %}
+                {% for offering in course.offerings %}
+                  <option value="{{ offering.group.full_path }}">{{ offering.group.full_path }}</option>
+                {% endfor %}
+              {% endfor %}
+            </select>
+
+            <label for="offering_path">Offering path</label>
+            <input id="offering_path" name="offering_path" placeholder="autumn-2026">
+
+            <label for="offering_name">Offering name</label>
+            <input id="offering_name" name="offering_name" placeholder="Autumn 2026">
+          </div>
+
+          <div>
+            <label for="existing_assessment_full_path">Existing assessment</label>
+            <select id="existing_assessment_full_path" name="existing_assessment_full_path">
+              <option value="">Create or reuse assessment path below</option>
+              {% for course in course_groups %}
+                {% for offering in course.offerings %}
+                  {% for assessment in offering.assessments %}
+                    <option value="{{ assessment.full_path }}">{{ assessment.full_path }}</option>
+                  {% endfor %}
+                {% endfor %}
+              {% endfor %}
+            </select>
+
+            <label for="assessment_path">Assessment path</label>
+            <input id="assessment_path" name="assessment_path" placeholder="pa2621">
+
+            <label for="assessment_name">Assessment name</label>
+            <input id="assessment_name" name="assessment_name" placeholder="PA2621">
+          </div>
+        </div>
 
         <label for="csv_file">CSV file</label>
         <input id="csv_file" name="csv_file" type="file" accept=".csv,text/csv" required>
 
-        <button type="submit">Validate</button>
+        <button type="submit">Review dry run</button>
       </form>
 
       {% if error %}
@@ -113,6 +232,185 @@
           <pre>{{ result | tojson(indent=2) }}</pre>
         </section>
       {% endif %}
+
+      {% if dry_run %}
+        <section>
+          <h2>Dry-run result</h2>
+          <p>Run ID: {{ dry_run.run_id }}</p>
+          <p>Status: {{ "valid" if dry_run.valid else "invalid" }}</p>
+          <p>Projects: {{ dry_run.project_count }}</p>
+          <p>Student memberships: {{ dry_run.student_count }}</p>
+          {% if dry_run.errors %}
+            <h3>Errors</h3>
+            <ul class="status-list">
+              {% for item in dry_run.errors %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          {% if dry_run.warnings %}
+            <h3>Warnings</h3>
+            <ul class="status-list">
+              {% for item in dry_run.warnings %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          <pre>{{ dry_run | tojson(indent=2) }}</pre>
+        </section>
+      {% endif %}
+
+      <script>
+          const groupStatus = document.getElementById("group_status");
+          const courseGroupList = document.getElementById("course_group_list");
+          const createNewCourse = document.getElementById("create_new_course");
+          const selectedCourseDisplay = document.getElementById("selected_course_display");
+          const parentGroupPath = document.getElementById("parent_group_path");
+          const newCourseFields = document.getElementById("new_course_fields");
+          const newCoursePath = document.getElementById("new_course_path");
+          const existingOffering = document.getElementById("existing_offering_full_path");
+          const existingAssessment = document.getElementById("existing_assessment_full_path");
+
+          function appendOption(select, value, label) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            select.appendChild(option);
+          }
+
+          function resetSelect(select, label) {
+            select.replaceChildren();
+            appendOption(select, "", label);
+          }
+
+          function encodedPath(path) {
+            return path.split("/").map(encodeURIComponent).join("/");
+          }
+
+          function fetchJson(url) {
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), 10000);
+            return fetch(url, { signal: controller.signal })
+              .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+              .finally(() => window.clearTimeout(timeout));
+          }
+
+          function selectExistingCourse(path, name) {
+            parentGroupPath.value = path;
+            selectedCourseDisplay.value = `${name} (${path})`;
+            newCourseFields.classList.add("hidden");
+            newCoursePath.value = "";
+            resetSelect(existingOffering, "Loading offerings...");
+            resetSelect(existingAssessment, "Create or reuse assessment path below");
+            loadOfferings(path);
+          }
+
+          function appendCourseTree(course) {
+            const courseItem = document.createElement("li");
+            const courseName = document.createElement("button");
+            courseName.type = "button";
+            courseName.className = "course-select";
+            courseName.dataset.coursePath = course.parent.full_path;
+            courseName.textContent = course.parent.name;
+            courseName.addEventListener("click", () => {
+              selectExistingCourse(course.parent.full_path, course.parent.name);
+            });
+            const coursePath = document.createElement("span");
+            coursePath.className = "muted";
+            coursePath.textContent = ` ${course.parent.full_path}`;
+            courseItem.append(courseName, coursePath);
+
+            courseGroupList.appendChild(courseItem);
+          }
+
+          function loadOfferings(coursePath) {
+            fetchJson(`/groups/${encodedPath(coursePath)}/offerings`)
+              .then(({ ok, payload }) => {
+                resetSelect(existingOffering, "Create or reuse offering path below");
+                if (!ok) {
+                  groupStatus.textContent = payload.error_detail
+                    ? `${payload.error} ${payload.error_type || ""}: ${payload.error_detail}`
+                    : payload.error || "GitLab offering browse failed.";
+                  return;
+                }
+
+                for (const offering of payload.offerings) {
+                  appendOption(existingOffering, offering.full_path, offering.full_path);
+                }
+              })
+              .catch(() => {
+                resetSelect(existingOffering, "Create or reuse offering path below");
+                groupStatus.textContent = "GitLab offering browse timed out or failed.";
+              });
+          }
+
+          function loadAssessments(offeringPath) {
+            fetchJson(`/groups/${encodedPath(offeringPath)}/assessments`)
+              .then(({ ok, payload }) => {
+                resetSelect(existingAssessment, "Create or reuse assessment path below");
+                if (!ok) {
+                  groupStatus.textContent = payload.error_detail
+                    ? `${payload.error} ${payload.error_type || ""}: ${payload.error_detail}`
+                    : payload.error || "GitLab assessment browse failed.";
+                  return;
+                }
+
+                for (const assessment of payload.assessments) {
+                  appendOption(existingAssessment, assessment.full_path, assessment.full_path);
+                }
+              })
+              .catch(() => {
+                resetSelect(existingAssessment, "Create or reuse assessment path below");
+                groupStatus.textContent = "GitLab assessment browse timed out or failed.";
+              });
+          }
+
+          createNewCourse.addEventListener("click", () => {
+            parentGroupPath.value = "";
+            selectedCourseDisplay.value = "New course";
+            newCourseFields.classList.remove("hidden");
+            resetSelect(existingOffering, "Create or reuse offering path below");
+            resetSelect(existingAssessment, "Create or reuse assessment path below");
+            newCoursePath.focus();
+          });
+
+          newCoursePath.addEventListener("input", () => {
+            const cleanPath = newCoursePath.value.trim().replace(/^\/+|\/+$/g, "");
+            parentGroupPath.value = cleanPath;
+            selectedCourseDisplay.value = cleanPath ? `New course (${cleanPath})` : "New course";
+          });
+
+          existingOffering.addEventListener("change", () => {
+            resetSelect(existingAssessment, "Create or reuse assessment path below");
+            if (existingOffering.value) {
+              loadAssessments(existingOffering.value);
+            }
+          });
+
+          {% if config.gitlab_configured %}
+            fetchJson("/groups")
+            .then(({ ok, payload }) => {
+              if (!ok) {
+                const diagnostic = payload.error_detail
+                  ? `${payload.error} ${payload.error_type || ""}: ${payload.error_detail}`
+                  : payload.error || "GitLab group browse failed.";
+                groupStatus.textContent = diagnostic;
+                return;
+              }
+
+              for (const course of payload.groups) {
+                appendCourseTree(course);
+              }
+
+              groupStatus.textContent = payload.groups.length
+                ? "Existing GitLab course groups loaded."
+                : "No top-level GitLab course groups were returned.";
+            })
+            .catch(() => {
+              groupStatus.textContent = "GitLab group browse timed out or failed.";
+            });
+          {% endif %}
+      </script>
     </main>
   </body>
 </html>
