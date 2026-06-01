@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from io import StringIO
+from typing import Iterable
 
 
 GROUP_COLUMNS = {"project_path", "project_name", "student_ids"}
@@ -25,7 +26,7 @@ def parse_projects_csv(content: str) -> list[ProjectCsvRow]:
     columns = set(reader.fieldnames or [])
 
     if GROUP_COLUMNS.issubset(columns):
-        return [_parse_group_row(row) for row in reader if _has_values(row)]
+        return _parse_group_rows(row for row in reader if _has_values(row))
 
     if INDIVIDUAL_COLUMNS.issubset(columns):
         return [_parse_individual_row(row) for row in reader if _has_values(row)]
@@ -37,12 +38,30 @@ def parse_projects_csv(content: str) -> list[ProjectCsvRow]:
     )
 
 
-def _parse_group_row(row: dict[str, str | None]) -> ProjectCsvRow:
-    return ProjectCsvRow(
-        project_path=_clean(row.get("project_path")),
-        project_name=_clean(row.get("project_name")),
-        student_ids=_split_student_ids(row.get("student_ids")),
-    )
+def _parse_group_rows(rows: Iterable[dict[str, str | None]]) -> list[ProjectCsvRow]:
+    grouped_rows: dict[tuple[str, str], list[str]] = {}
+
+    for row in rows:
+        project_path = _clean(row.get("project_path"))
+        project_name = _clean(row.get("project_name"))
+        student_id = _clean(row.get("student_ids"))
+        if ";" in student_id:
+            raise CsvParseError(
+                "Group CSV student_ids must contain one student ID per row, "
+                "not semicolon-delimited values."
+            )
+        grouped_rows.setdefault((project_path, project_name), [])
+        if student_id:
+            grouped_rows[(project_path, project_name)].append(student_id)
+
+    return [
+        ProjectCsvRow(
+            project_path=project_path,
+            project_name=project_name,
+            student_ids=student_ids,
+        )
+        for (project_path, project_name), student_ids in grouped_rows.items()
+    ]
 
 
 def _parse_individual_row(row: dict[str, str | None]) -> ProjectCsvRow:
@@ -52,10 +71,6 @@ def _parse_individual_row(row: dict[str, str | None]) -> ProjectCsvRow:
         project_name=_clean(row.get("project_name")),
         student_ids=[student_id] if student_id else [],
     )
-
-
-def _split_student_ids(value: str | None) -> list[str]:
-    return [part.strip() for part in (value or "").split(";") if part.strip()]
 
 
 def _clean(value: str | None) -> str:

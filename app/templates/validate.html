@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Class Git Forge</title>
+    <title>Git Classroom Forge</title>
     <style>
       :root {
         color-scheme: light;
@@ -23,13 +23,36 @@
         padding: 32px 20px;
       }
 
-      form,
       section {
         background: #ffffff;
         border: 1px solid #d8dee8;
         border-radius: 6px;
         padding: 20px;
         margin-top: 20px;
+      }
+
+      fieldset {
+        border: 0;
+        margin: 0;
+        padding: 0;
+      }
+
+      fieldset[disabled] {
+        opacity: 0.55;
+      }
+
+      fieldset[disabled] input,
+      fieldset[disabled] select,
+      fieldset[disabled] button {
+        cursor: not-allowed;
+      }
+
+      legend {
+        display: block;
+        font-size: 1.5em;
+        font-weight: 700;
+        margin: 0;
+        padding: 0;
       }
 
       label {
@@ -54,9 +77,36 @@
         margin-top: 18px;
         border: 0;
         border-radius: 4px;
-        background: #14532d;
+        background: #A71D2A;
         color: #ffffff;
         cursor: pointer;
+      }
+
+      button:disabled {
+        background: #cbd5e1;
+        color: #52606d;
+        cursor: not-allowed;
+      }
+
+      .text-button {
+        background: transparent;
+        color: #A71D2A;
+        display: inline;
+        font-weight: 700;
+        margin-top: 10px;
+        padding: 0;
+        text-align: left;
+        width: auto;
+      }
+
+      .text-button:hover,
+      .text-button:focus {
+        text-decoration: underline;
+      }
+
+      .text-button:disabled {
+        background: transparent;
+        color: #94a3b8;
       }
 
       pre {
@@ -76,10 +126,23 @@
         color: #52606d;
       }
 
-      .grid {
+      .assessment-flow {
         display: grid;
         gap: 16px;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .assessment-field-group {
+        min-width: 0;
+      }
+
+      .derived-path {
+        color: #52606d;
+        margin: 8px 0 0;
+      }
+
+      .derived-path code {
+        color: #1f2933;
+        font-weight: 700;
       }
 
       .group-list {
@@ -95,11 +158,180 @@
         display: none;
       }
 
+      .step {
+        scroll-margin-top: 20px;
+      }
+
+      .step-header {
+        align-items: flex-start;
+        display: flex;
+        gap: 14px;
+        justify-content: space-between;
+      }
+
+      .step-number {
+        align-items: center;
+        background: #A71D2A;
+        border-radius: 999px;
+        color: #ffffff;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-weight: 700;
+        height: 32px;
+        justify-content: center;
+        margin-top: 2px;
+        width: 32px;
+      }
+
+      .step-copy {
+        flex: 1;
+      }
+
+      .step-copy h2,
+      .step-copy legend {
+        margin: 0;
+      }
+
+      .step-copy p {
+        margin: 4px 0 0;
+      }
+
+      .step-status {
+        border: 1px solid #d8dee8;
+        border-radius: 999px;
+        color: #52606d;
+        flex: 0 0 auto;
+        font-size: 0.9rem;
+        padding: 4px 10px;
+      }
+
+      .step.is-complete .step-status {
+        border-color: #A71D2A;
+        color: #A71D2A;
+      }
+
+      .step.is-locked .step-status {
+        background: #eef2f7;
+      }
+
+      .choice-stack {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .assessment-mode-choices {
+        margin-top: 28px;
+      }
+
+      .choice-row {
+        align-items: start;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: auto 1fr;
+      }
+
+      .choice-row input {
+        margin-top: 5px;
+        width: auto;
+      }
+
+      .choice-row label {
+        margin-top: 0;
+      }
+
+      .summary {
+        background: #eef2f7;
+        border-radius: 6px;
+        margin-top: 16px;
+        padding: 14px;
+      }
+
+      .summary p,
+      .summary dl,
+      .summary dd {
+        margin: 0;
+      }
+
+      .summary-selection-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .summary-item {
+        align-items: baseline;
+        background: #ffffff;
+        border: 1px solid #d8dee8;
+        border-radius: 6px;
+        display: inline-flex;
+        gap: 6px;
+        padding: 6px 8px;
+      }
+
+      .summary-label {
+        color: #52606d;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .summary-value {
+        font-weight: 700;
+      }
+
+      .summary-callout {
+        align-items: start;
+        background: #f8fafc;
+        border: 1px solid #d8dee8;
+        border-radius: 6px;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: auto 1fr;
+        margin-top: 14px;
+        padding: 10px 12px;
+      }
+
+      .info-icon {
+        align-items: center;
+        background: #A71D2A;
+        border-radius: 999px;
+        color: #ffffff;
+        display: inline-flex;
+        font-size: 0.85rem;
+        font-weight: 700;
+        height: 22px;
+        justify-content: center;
+        width: 22px;
+      }
+
+      .sample-downloads {
+        margin-top: 10px;
+      }
+
+      .sample-downloads p {
+        margin: 0 0 6px;
+      }
+
+      .sample-download {
+        color: #A71D2A;
+        font-weight: 700;
+      }
+
+      .full-width-action {
+        border-top: 1px solid #d8dee8;
+        margin-top: 22px;
+        padding-top: 22px;
+      }
+
+      .full-width-action button {
+        width: 100%;
+      }
+
       .course-select {
         appearance: none;
         border: 0;
         background: transparent;
-        color: #14532d;
+        color: #A71D2A;
         cursor: pointer;
         display: inline;
         font: inherit;
@@ -131,7 +363,7 @@
   </head>
   <body>
     <main>
-      <h1>Class Git Forge</h1>
+      <h1>Git Classroom Forge</h1>
       <p>Validate GitLab course repository CSV files before provisioning.</p>
 
       {% if browse_error %}
@@ -141,8 +373,15 @@
         </section>
       {% endif %}
 
-      <section>
-        <h2>Select your course</h2>
+      <section id="course_step" class="step" data-step="course">
+        <div class="step-header">
+          <span class="step-number">1</span>
+          <div class="step-copy">
+            <h2>Existing Courses</h2>
+            <p class="muted">Select your course from GitLab or create a new course path.</p>
+          </div>
+          <span id="course_step_status" class="step-status">Required</span>
+        </div>
         <p id="group_status" class="muted">
           {% if config.gitlab_configured %}
             Loading existing GitLab course groups...
@@ -154,66 +393,132 @@
         <div class="course-actions">
           <button id="create_new_course" type="button">Create new course</button>
         </div>
-        {% if config.gitlab_configured %}
-          <p class="muted">Choose an existing course or create a new course path.</p>
-        {% endif %}
-      </section>
-
-      <form action="/dry-run" method="post" enctype="multipart/form-data">
-        <h2>Dry-run assessment provisioning</h2>
-        <label for="selected_course_display">Selected course</label>
-        <input id="selected_course_display" readonly value="No course selected">
-        <input id="parent_group_path" name="parent_group_path" type="hidden">
-
         <div id="new_course_fields" class="hidden">
           <label for="new_course_path">New course path</label>
           <input id="new_course_path" placeholder="professional-experience">
         </div>
+      </section>
 
-        <div class="grid">
-          <div>
-            <label for="existing_offering_full_path">Existing offering</label>
-            <select id="existing_offering_full_path" name="existing_offering_full_path">
-              <option value="">Create or reuse offering path below</option>
-              {% for course in course_groups %}
-                {% for offering in course.offerings %}
-                  <option value="{{ offering.group.full_path }}">{{ offering.group.full_path }}</option>
-                {% endfor %}
-              {% endfor %}
-            </select>
+      <form action="/dry-run" method="post" enctype="multipart/form-data">
+        <input id="parent_group_path" name="parent_group_path" type="hidden">
 
-            <label for="offering_path">Offering path</label>
-            <input id="offering_path" name="offering_path" placeholder="autumn-2026">
+        <section id="assessment_section" class="step is-locked" data-step="assessment">
+          <fieldset id="assessment_step" disabled>
+            <div class="step-header">
+              <span class="step-number">2</span>
+              <div class="step-copy">
+                <legend>Assessment Provisioning</legend>
+                <p class="muted">Provision an assessment by choosing its offering and base repository name.</p>
+              </div>
+              <span id="assessment_step_status" class="step-status">Locked</span>
+            </div>
 
-            <label for="offering_name">Offering name</label>
-            <input id="offering_name" name="offering_name" placeholder="Autumn 2026">
-          </div>
+            <label for="selected_course_display">Selected course</label>
+            <input id="selected_course_display" readonly value="No course selected">
 
-          <div>
-            <label for="existing_assessment_full_path">Existing assessment</label>
-            <select id="existing_assessment_full_path" name="existing_assessment_full_path">
-              <option value="">Create or reuse assessment path below</option>
-              {% for course in course_groups %}
-                {% for offering in course.offerings %}
-                  {% for assessment in offering.assessments %}
-                    <option value="{{ assessment.full_path }}">{{ assessment.full_path }}</option>
+            <div class="assessment-flow">
+              <div class="assessment-field-group">
+                <label for="existing_offering_full_path">Select offering</label>
+                <p class="muted">The offering is the delivery period, for example Autumn 2026.</p>
+                <select id="existing_offering_full_path" name="existing_offering_full_path">
+                  <option value="">Select previous offering</option>
+                  {% for course in course_groups %}
+                    {% for offering in course.offerings %}
+                      <option value="{{ offering.group.full_path }}">{{ offering.group.full_path }}</option>
+                    {% endfor %}
                   {% endfor %}
-                {% endfor %}
-              {% endfor %}
-            </select>
+                </select>
+                <button id="create_new_offering" class="text-button" type="button">Create new offering</button>
 
-            <label for="assessment_path">Assessment path</label>
-            <input id="assessment_path" name="assessment_path" placeholder="pa2621">
+                <div id="new_offering_fields" class="hidden">
+                  <label for="new_offering_name">New offering display name</label>
+                  <input id="new_offering_name" placeholder="Autumn 2026">
+                  <p class="derived-path">Offering ID: <code id="offering_derived_path">Enter a display name</code></p>
+                </div>
+                <input id="offering_path" name="offering_path" type="hidden">
+                <input id="offering_name" name="offering_name" type="hidden">
+              </div>
 
-            <label for="assessment_name">Assessment name</label>
-            <input id="assessment_name" name="assessment_name" placeholder="PA2621">
-          </div>
-        </div>
+              <div class="assessment-field-group">
+                <label for="existing_assessment_full_path">Select assessment</label>
+                <select id="existing_assessment_full_path" name="existing_assessment_full_path">
+                  <option value="">Select previous assessment</option>
+                  {% for course in course_groups %}
+                    {% for offering in course.offerings %}
+                      {% for assessment in offering.assessments %}
+                        <option value="{{ assessment.full_path }}">{{ assessment.full_path }}</option>
+                      {% endfor %}
+                    {% endfor %}
+                  {% endfor %}
+                </select>
+                <button id="create_new_assessment" class="text-button" type="button">Create new assessment</button>
 
-        <label for="csv_file">CSV file</label>
-        <input id="csv_file" name="csv_file" type="file" accept=".csv,text/csv" required>
+                <div id="new_assessment_fields" class="hidden">
+                  <label for="new_assessment_name">New assessment display name</label>
+                  <p class="muted">This will be the name of the assessment group.</p>
+                  <input id="new_assessment_name" placeholder="my-first-repo">
+                  <p class="derived-path">Assessment ID: <code id="assessment_derived_path">Enter a display name</code></p>
+                </div>
+                <input id="assessment_path" name="assessment_path" type="hidden">
+                <input id="assessment_name" name="assessment_name" type="hidden">
+              </div>
+            </div>
 
-        <button type="submit">Review dry run</button>
+            <div class="choice-stack assessment-mode-choices">
+              <div class="choice-row">
+                <input id="group_assessment" name="assessment_mode" type="radio" value="group">
+                <div>
+                  <label for="group_assessment">Group Assessment</label>
+                  <p class="muted">The group name from the CSV will be the project/repository name.</p>
+                </div>
+              </div>
+              <div class="choice-row">
+                <input id="individual_assessment" name="assessment_mode" type="radio" value="individual">
+                <div>
+                  <label for="individual_assessment">Individual Assessment</label>
+                  <p class="muted">Each student ID from the CSV will get its own project/repository inside this assessment.</p>
+                </div>
+              </div>
+            </div>
+
+          </fieldset>
+        </section>
+
+        <section id="provision_section" class="step is-locked" data-step="provision">
+          <fieldset id="provision_step" disabled>
+            <div class="step-header">
+              <span class="step-number">3</span>
+              <div class="step-copy">
+                <legend>Provision Details</legend>
+                <p class="muted">Confirm the target, upload the roster CSV, then run a non-destructive dry run.</p>
+              </div>
+              <span id="provision_step_status" class="step-status">Locked</span>
+            </div>
+
+            <div class="summary">
+              <p id="provision_summary" class="summary-selection-list">Complete the assessment details to review the provision target.</p>
+              <div class="summary-callout" role="note">
+                <span class="info-icon" aria-hidden="true">i</span>
+                <p class="muted">This process is additive. Existing repositories will not be replaced or overwritten.</p>
+              </div>
+            </div>
+
+            <label for="csv_file">Select Student Roster</label>
+            <input id="csv_file" name="csv_file" type="file" accept=".csv,text/csv" required>
+            <div class="sample-downloads">
+              <p id="csv_sample_help" class="muted">Download a sample CSV for the selected assessment type.</p>
+              <a id="csv_sample_download" class="sample-download" href="/sample-csv/group" download>Download group assessment CSV sample</a>
+              <a id="csv_sample_download_individual" class="sample-download hidden" href="/sample-csv/individual" download>Download individual assessment CSV sample</a>
+            </div>
+
+            <div class="full-width-action">
+              <button id="dry_run_button" type="submit" disabled>Perform Dry Run</button>
+            </div>
+            <div class="full-width-action">
+              <button id="provision_button" type="button" disabled title="Provisioning is intentionally unavailable until destructive GitLab actions are implemented.">Provision</button>
+            </div>
+          </fieldset>
+        </section>
       </form>
 
       {% if error %}
@@ -269,7 +574,34 @@
           const newCourseFields = document.getElementById("new_course_fields");
           const newCoursePath = document.getElementById("new_course_path");
           const existingOffering = document.getElementById("existing_offering_full_path");
+          const createNewOffering = document.getElementById("create_new_offering");
+          const newOfferingFields = document.getElementById("new_offering_fields");
+          const newOfferingName = document.getElementById("new_offering_name");
+          const offeringDerivedPath = document.getElementById("offering_derived_path");
           const existingAssessment = document.getElementById("existing_assessment_full_path");
+          const createNewAssessment = document.getElementById("create_new_assessment");
+          const newAssessmentFields = document.getElementById("new_assessment_fields");
+          const newAssessmentName = document.getElementById("new_assessment_name");
+          const assessmentDerivedPath = document.getElementById("assessment_derived_path");
+          const courseStep = document.getElementById("course_step");
+          const courseStepStatus = document.getElementById("course_step_status");
+          const assessmentSection = document.getElementById("assessment_section");
+          const assessmentStep = document.getElementById("assessment_step");
+          const assessmentStepStatus = document.getElementById("assessment_step_status");
+          const provisionSection = document.getElementById("provision_section");
+          const provisionStep = document.getElementById("provision_step");
+          const provisionStepStatus = document.getElementById("provision_step_status");
+          const offeringPath = document.getElementById("offering_path");
+          const offeringName = document.getElementById("offering_name");
+          const assessmentPath = document.getElementById("assessment_path");
+          const assessmentName = document.getElementById("assessment_name");
+          const assessmentModes = document.querySelectorAll("input[name='assessment_mode']");
+          const provisionSummary = document.getElementById("provision_summary");
+          const csvFile = document.getElementById("csv_file");
+          const csvSampleHelp = document.getElementById("csv_sample_help");
+          const groupCsvSampleDownload = document.getElementById("csv_sample_download");
+          const individualCsvSampleDownload = document.getElementById("csv_sample_download_individual");
+          const dryRunButton = document.getElementById("dry_run_button");
 
           function appendOption(select, value, label) {
             const option = document.createElement("option");
@@ -295,13 +627,129 @@
               .finally(() => window.clearTimeout(timeout));
           }
 
+          function selectedModeLabel() {
+            const selected = document.querySelector("input[name='assessment_mode']:checked");
+            if (!selected) {
+              return "";
+            }
+            return selected.value === "group" ? "group assessment" : "individual assessment";
+          }
+
+          function selectedModeArticle() {
+            const label = selectedModeLabel();
+            return label.startsWith("individual") ? "an" : "a";
+          }
+
+          function slugifyPath(value) {
+            return value
+              .trim()
+              .toLowerCase()
+              .replace(/([a-z])([0-9])/g, "$1-$2")
+              .replace(/([0-9])([a-z])/g, "$1-$2")
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "");
+          }
+
+          function hasCourseSelection() {
+            return Boolean(parentGroupPath.value.trim());
+          }
+
+          function hasAssessmentSelection() {
+            const hasOffering = Boolean(existingOffering.value || offeringPath.value.trim());
+            const hasAssessment = Boolean(existingAssessment.value || assessmentPath.value.trim());
+            return hasCourseSelection() && hasOffering && hasAssessment && Boolean(selectedModeLabel());
+          }
+
+          function displayPath(path) {
+            return path || "new path";
+          }
+
+          function appendSummaryItem(label, value) {
+            const item = document.createElement("span");
+            item.className = "summary-item";
+
+            const labelNode = document.createElement("span");
+            labelNode.className = "summary-label";
+            labelNode.textContent = `${label}:`;
+
+            const valueNode = document.createElement("span");
+            valueNode.className = "summary-value";
+            valueNode.textContent = value;
+
+            item.append(labelNode, valueNode);
+            provisionSummary.appendChild(item);
+          }
+
+          function clearNewOffering() {
+            newOfferingFields.classList.add("hidden");
+            newOfferingName.value = "";
+            offeringPath.value = "";
+            offeringName.value = "";
+            offeringDerivedPath.textContent = "Enter a display name";
+          }
+
+          function clearNewAssessment() {
+            newAssessmentFields.classList.add("hidden");
+            newAssessmentName.value = "";
+            assessmentPath.value = "";
+            assessmentName.value = "";
+            assessmentDerivedPath.textContent = "Enter a display name";
+          }
+
+          function updateStepState(section, fieldset, status, enabled, complete) {
+            fieldset.disabled = !enabled;
+            section.classList.toggle("is-locked", !enabled);
+            section.classList.toggle("is-complete", complete);
+            status.textContent = complete ? "Complete" : enabled ? "Ready" : "Locked";
+          }
+
+          function updateSampleDownload() {
+            const selected = document.querySelector("input[name='assessment_mode']:checked");
+            const isIndividual = selected && selected.value === "individual";
+            groupCsvSampleDownload.classList.toggle("hidden", isIndividual);
+            individualCsvSampleDownload.classList.toggle("hidden", !isIndividual);
+            csvSampleHelp.textContent = isIndividual
+              ? "Use this sample when each student should receive a project/repository inside the selected assessment."
+              : "Use this sample when each CSV group should become a project/repository for the selected assessment.";
+          }
+
+          function updateProgressiveWorkflow() {
+            const courseReady = hasCourseSelection();
+            const assessmentReady = hasAssessmentSelection();
+            const csvReady = Boolean(csvFile.files && csvFile.files.length);
+
+            updateSampleDownload();
+            courseStep.classList.toggle("is-complete", courseReady);
+            courseStepStatus.textContent = courseReady ? "Complete" : "Required";
+            updateStepState(assessmentSection, assessmentStep, assessmentStepStatus, courseReady, assessmentReady);
+            updateStepState(provisionSection, provisionStep, provisionStepStatus, assessmentReady, csvReady);
+
+            dryRunButton.disabled = !(assessmentReady && csvReady);
+
+            if (assessmentReady) {
+              const offering = displayPath(existingOffering.value || offeringName.value.trim() || offeringPath.value.trim());
+              const assessment = displayPath(existingAssessment.value || assessmentName.value.trim() || assessmentPath.value.trim());
+              provisionSummary.replaceChildren();
+              appendSummaryItem("Course", selectedCourseDisplay.value);
+              appendSummaryItem("Offering", offering);
+              appendSummaryItem("Assessment", assessment);
+              appendSummaryItem("Mode", `${selectedModeArticle()} ${selectedModeLabel()}`);
+            } else {
+              provisionSummary.textContent = "Complete the assessment details to review the provision target.";
+            }
+          }
+
           function selectExistingCourse(path, name) {
             parentGroupPath.value = path;
             selectedCourseDisplay.value = `${name} (${path})`;
             newCourseFields.classList.add("hidden");
             newCoursePath.value = "";
+            clearNewOffering();
+            clearNewAssessment();
             resetSelect(existingOffering, "Loading offerings...");
-            resetSelect(existingAssessment, "Create or reuse assessment path below");
+            resetSelect(existingAssessment, "Select previous assessment");
+            updateProgressiveWorkflow();
+            assessmentSection.scrollIntoView({ behavior: "smooth", block: "start" });
             loadOfferings(path);
           }
 
@@ -326,7 +774,7 @@
           function loadOfferings(coursePath) {
             fetchJson(`/groups/${encodedPath(coursePath)}/offerings`)
               .then(({ ok, payload }) => {
-                resetSelect(existingOffering, "Create or reuse offering path below");
+                resetSelect(existingOffering, "Select previous offering");
                 if (!ok) {
                   groupStatus.textContent = payload.error_detail
                     ? `${payload.error} ${payload.error_type || ""}: ${payload.error_detail}`
@@ -337,17 +785,19 @@
                 for (const offering of payload.offerings) {
                   appendOption(existingOffering, offering.full_path, offering.full_path);
                 }
+                updateProgressiveWorkflow();
               })
               .catch(() => {
-                resetSelect(existingOffering, "Create or reuse offering path below");
+                resetSelect(existingOffering, "Select previous offering");
                 groupStatus.textContent = "GitLab offering browse timed out or failed.";
+                updateProgressiveWorkflow();
               });
           }
 
           function loadAssessments(offeringPath) {
             fetchJson(`/groups/${encodedPath(offeringPath)}/assessments`)
               .then(({ ok, payload }) => {
-                resetSelect(existingAssessment, "Create or reuse assessment path below");
+                resetSelect(existingAssessment, "Select previous assessment");
                 if (!ok) {
                   groupStatus.textContent = payload.error_detail
                     ? `${payload.error} ${payload.error_type || ""}: ${payload.error_detail}`
@@ -358,10 +808,12 @@
                 for (const assessment of payload.assessments) {
                   appendOption(existingAssessment, assessment.full_path, assessment.full_path);
                 }
+                updateProgressiveWorkflow();
               })
               .catch(() => {
-                resetSelect(existingAssessment, "Create or reuse assessment path below");
+                resetSelect(existingAssessment, "Select previous assessment");
                 groupStatus.textContent = "GitLab assessment browse timed out or failed.";
+                updateProgressiveWorkflow();
               });
           }
 
@@ -369,8 +821,11 @@
             parentGroupPath.value = "";
             selectedCourseDisplay.value = "New course";
             newCourseFields.classList.remove("hidden");
-            resetSelect(existingOffering, "Create or reuse offering path below");
-            resetSelect(existingAssessment, "Create or reuse assessment path below");
+            clearNewOffering();
+            clearNewAssessment();
+            resetSelect(existingOffering, "Select previous offering");
+            resetSelect(existingAssessment, "Select previous assessment");
+            updateProgressiveWorkflow();
             newCoursePath.focus();
           });
 
@@ -378,15 +833,64 @@
             const cleanPath = newCoursePath.value.trim().replace(/^\/+|\/+$/g, "");
             parentGroupPath.value = cleanPath;
             selectedCourseDisplay.value = cleanPath ? `New course (${cleanPath})` : "New course";
+            updateProgressiveWorkflow();
           });
 
           existingOffering.addEventListener("change", () => {
-            resetSelect(existingAssessment, "Create or reuse assessment path below");
+            clearNewAssessment();
+            resetSelect(existingAssessment, "Select previous assessment");
             if (existingOffering.value) {
+              clearNewOffering();
               loadAssessments(existingOffering.value);
             }
+            updateProgressiveWorkflow();
           });
 
+          createNewOffering.addEventListener("click", () => {
+            existingOffering.value = "";
+            clearNewAssessment();
+            resetSelect(existingAssessment, "Select previous assessment");
+            newOfferingFields.classList.remove("hidden");
+            newOfferingName.focus();
+            updateProgressiveWorkflow();
+          });
+
+          newOfferingName.addEventListener("input", () => {
+            const name = newOfferingName.value.trim();
+            const derivedPath = slugifyPath(name);
+            offeringName.value = name;
+            offeringPath.value = derivedPath;
+            offeringDerivedPath.textContent = derivedPath || "Enter a display name";
+            updateProgressiveWorkflow();
+          });
+
+          existingAssessment.addEventListener("change", () => {
+            if (existingAssessment.value) {
+              clearNewAssessment();
+            }
+            updateProgressiveWorkflow();
+          });
+
+          createNewAssessment.addEventListener("click", () => {
+            existingAssessment.value = "";
+            newAssessmentFields.classList.remove("hidden");
+            newAssessmentName.focus();
+            updateProgressiveWorkflow();
+          });
+
+          newAssessmentName.addEventListener("input", () => {
+            const name = newAssessmentName.value.trim();
+            const derivedPath = slugifyPath(name);
+            assessmentPath.value = derivedPath;
+            assessmentName.value = name;
+            assessmentDerivedPath.textContent = derivedPath || "Enter a display name";
+            updateProgressiveWorkflow();
+          });
+
+          csvFile.addEventListener("change", updateProgressiveWorkflow);
+          for (const mode of assessmentModes) {
+            mode.addEventListener("change", updateProgressiveWorkflow);
+          }
           {% if config.gitlab_configured %}
             fetchJson("/groups")
             .then(({ ok, payload }) => {
@@ -410,6 +914,7 @@
               groupStatus.textContent = "GitLab group browse timed out or failed.";
             });
           {% endif %}
+          updateProgressiveWorkflow();
       </script>
     </main>
   </body>

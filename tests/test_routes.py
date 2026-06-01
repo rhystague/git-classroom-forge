@@ -227,6 +227,136 @@ def test_validate_form_does_not_block_on_group_browse(tmp_path):
     assert gitlab.browse_calls == 0
 
 
+def test_validate_form_renders_progressive_workflow_sections(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": FakeRouteGitLabClient(),
+        }
+    )
+
+    response = app.test_client().get("/validate")
+
+    assert response.status_code == 200
+    assert b"Git Classroom Forge" in response.data
+    assert b"Class Git Forge" not in response.data
+    assert b'data-step="course"' in response.data
+    assert b'data-step="assessment"' in response.data
+    assert b'data-step="provision"' in response.data
+    assert b'id="assessment_step" disabled' in response.data
+    assert b'id="provision_step" disabled' in response.data
+    assert b"Assessment Provisioning" in response.data
+    assert b"Provision Details" in response.data
+    assert b"Choose an existing course or create a new course path." not in response.data
+    assert b"#A71D2A" in response.data
+    assert b"#14532d" not in response.data
+    assert b'class="assessment-flow"' in response.data
+    assert b'class="assessment-field-group"' in response.data
+    assert b'<div class="grid">' not in response.data
+    assert b"Create new offering" in response.data
+    assert b'id="create_new_offering"' in response.data
+    assert b'id="new_offering_name"' in response.data
+    assert b'id="offering_derived_path"' in response.data
+    assert b"Offering ID" in response.data
+    assert b'for="offering_path">Offering path' not in response.data
+    assert b'for="offering_name">Offering name' not in response.data
+    assert b"Select assessment" in response.data
+    assert b"Create new assessment" in response.data
+    assert b'id="create_new_assessment"' in response.data
+    assert b'id="new_assessment_name"' in response.data
+    assert b'id="assessment_derived_path"' in response.data
+    assert b"Assessment ID" in response.data
+    assert b"Assessment display name" not in response.data
+    assert b"This will be the name of the assessment group." in response.data
+    assert b'class="choice-stack assessment-mode-choices"' in response.data
+    assert b"The group name from the CSV will be the project/repository name." in response.data
+    assert (
+        b"Each student ID from the CSV will get its own project/repository inside "
+        b"this assessment."
+    ) in response.data
+    assert b'id="provision_summary" class="summary-selection-list"' in response.data
+    assert b"className = \"summary-value\"" in response.data
+    assert b'class="summary-callout"' in response.data
+    assert b'class="info-icon"' in response.data
+    assert b"Select Student Roster" in response.data
+    assert b'id="csv_sample_download"' in response.data
+    assert b'href="/sample-csv/group"' in response.data
+    assert b'href="/sample-csv/individual"' in response.data
+    assert b'id="review_provision"' not in response.data
+    assert b"Review Provision" not in response.data
+    assert b"Perform Dry Run" in response.data
+    assert b"Provision" in response.data
+    assert b'replace(/([a-z])([0-9])/g, "$1-$2")' in response.data
+    assert b"offeringDerivedPath.textContent" in response.data
+    assert b"assessmentDerivedPath.textContent" in response.data
+    assert b"updateProgressiveWorkflow" in response.data
+
+
+def test_sample_group_csv_download_uses_group_project_format(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+        }
+    )
+
+    response = app.test_client().get("/sample-csv/group")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/csv"
+    assert response.headers["Content-Disposition"] == (
+        "attachment; filename=group-assessment-sample.csv"
+    )
+    assert response.data == (
+        b"project_path,project_name,student_id\r\n"
+        b"team-01,Team 01,22048668\r\n"
+        b"team-01,Team 01,22049321\r\n"
+        b"team-02,Team 02,22051234\r\n"
+    )
+
+
+def test_sample_individual_csv_download_uses_student_project_format(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+        }
+    )
+
+    response = app.test_client().get("/sample-csv/individual")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/csv"
+    assert response.headers["Content-Disposition"] == (
+        "attachment; filename=individual-assessment-sample.csv"
+    )
+    assert response.data == (
+        b"student_id,project_path,project_name\r\n"
+        b"22048668,22048668,John Smith - 22048668\r\n"
+        b"22049321,22049321,Jane Doe - 22049321\r\n"
+    )
+
+
+def test_unknown_sample_csv_type_returns_not_found(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+        }
+    )
+
+    response = app.test_client().get("/sample-csv/unsupported")
+
+    assert response.status_code == 404
+
+
 def test_dry_run_route_persists_snapshot_and_renders_result(tmp_path):
     app = create_app(
         {
@@ -242,7 +372,8 @@ def test_dry_run_route_persists_snapshot_and_renders_result(tmp_path):
         }
     )
     csv_content = b"""project_path,project_name,student_ids
-team-01,Team 01,22048668;22049321
+team-01,Team 01,22048668
+team-01,Team 01,22049321
 """
 
     response = app.test_client().post(

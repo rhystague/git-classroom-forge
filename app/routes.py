@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from flask import Blueprint, current_app, jsonify, render_template, request
+from flask import Blueprint, Response, abort, current_app, jsonify, render_template, request
 
 from app.audit import write_audit_event
 from app.csv_parser import CsvParseError, parse_projects_csv
@@ -14,6 +14,27 @@ from app.validators import validate_project_rows
 
 
 bp = Blueprint("routes", __name__)
+
+
+CSV_SAMPLES = {
+    "group": {
+        "filename": "group-assessment-sample.csv",
+        "content": (
+            "project_path,project_name,student_id\r\n"
+            "team-01,Team 01,22048668\r\n"
+            "team-01,Team 01,22049321\r\n"
+            "team-02,Team 02,22051234\r\n"
+        ),
+    },
+    "individual": {
+        "filename": "individual-assessment-sample.csv",
+        "content": (
+            "student_id,project_path,project_name\r\n"
+            "22048668,22048668,John Smith - 22048668\r\n"
+            "22049321,22049321,Jane Doe - 22049321\r\n"
+        ),
+    },
+}
 
 
 @bp.get("/")
@@ -29,6 +50,21 @@ def health():
 @bp.get("/validate")
 def validate_form():
     return _render_validate()
+
+
+@bp.get("/sample-csv/<assessment_mode>")
+def sample_csv(assessment_mode: str):
+    sample = CSV_SAMPLES.get(assessment_mode)
+    if sample is None:
+        abort(404)
+
+    return Response(
+        sample["content"],
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={sample['filename']}",
+        },
+    )
 
 
 @bp.get("/groups")
