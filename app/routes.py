@@ -167,6 +167,38 @@ def group_assessments(offering_path: str):
     return jsonify({"assessments": [asdict(assessment) for assessment in assessments]})
 
 
+@bp.get("/groups/<path:course_path>/projects")
+def group_projects(course_path: str):
+    config = current_app.config["APP_CONFIG"]
+    if not config.gitlab_configured:
+        return (
+            jsonify(
+                {
+                    "projects": [],
+                    "error": "GITLAB_URL and GITLAB_TOKEN must be set before browsing GitLab projects.",
+                }
+            ),
+            503,
+        )
+
+    try:
+        projects = _gitlab_client().list_course_projects(course_path.strip("/"))
+    except Exception as exc:  # pragma: no cover - exercised with integration credentials.
+        return (
+            jsonify(
+                {
+                    "projects": [],
+                    "error": "GitLab project browse failed.",
+                    "error_type": type(exc).__name__,
+                    "error_detail": _safe_exception_detail(exc),
+                }
+            ),
+            502,
+        )
+
+    return jsonify({"projects": [asdict(project) for project in projects]})
+
+
 @bp.post("/validate")
 def validate_upload():
     uploaded = request.files.get("csv_file")
@@ -278,6 +310,8 @@ def _dry_run_selection_from_form() -> DryRunSelection:
         offering_name=request.form.get("offering_name", "").strip() or offering_path,
         assessment_path=assessment_path,
         assessment_name=request.form.get("assessment_name", "").strip() or assessment_path,
+        base_repository_mode=request.form.get("base_repository_mode", "").strip(),
+        base_repository_full_path=request.form.get("base_repository_full_path", "").strip().strip("/"),
     )
 
 

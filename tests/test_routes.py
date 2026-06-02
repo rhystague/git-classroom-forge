@@ -2,7 +2,12 @@ from io import BytesIO
 
 from app.main import create_app
 from app.config import AppConfig
-from app.gitlab_client import CourseGroupTree, GitLabGroupSummary, GitLabUserLookup
+from app.gitlab_client import (
+    CourseGroupTree,
+    GitLabGroupSummary,
+    GitLabProjectSummary,
+    GitLabUserLookup,
+)
 
 
 def test_health_route_returns_json_status(tmp_path):
@@ -58,6 +63,13 @@ class FakeRouteGitLabClient:
             created_at="2026-01-05T00:00:00Z",
             updated_at="2026-01-06T00:00:00Z",
         )
+        self.fork_source_project = GitLabProjectSummary(
+            id=20,
+            name="Python Starter",
+            path="python-starter",
+            path_with_namespace="professional-experience/examples/python-starter",
+            web_url="https://gitlab.example.edu.au/professional-experience/examples/python-starter",
+        )
 
     def browse_head_course_groups(self):
         self.browse_calls += 1
@@ -69,6 +81,11 @@ class FakeRouteGitLabClient:
     def list_assessments(self, offering_path):
         if offering_path == "professional-experience/autumn-2026":
             return [self.assessment]
+        return []
+
+    def list_course_projects(self, course_path):
+        if course_path == "professional-experience":
+            return [self.fork_source_project]
         return []
 
     def get_group_summary(self, full_path):
@@ -95,6 +112,9 @@ class FakeRouteGitLabClient:
 class FailingRouteGitLabClient:
     def browse_head_course_groups(self):
         raise RuntimeError("GitLab API unavailable")
+
+    def list_course_projects(self, course_path):
+        raise RuntimeError("GitLab API unavailable secret-token")
 
 
 def test_groups_route_returns_head_course_group_tree(tmp_path):
@@ -165,6 +185,71 @@ def test_assessments_route_returns_offering_assessments(tmp_path):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["assessments"][0]["full_path"] == "professional-experience/autumn-2026/pa2621"
+
+
+def test_projects_route_returns_course_fork_source_repositories(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": FakeRouteGitLabClient(),
+        }
+    )
+
+    response = app.test_client().get("/groups/professional-experience/projects")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["projects"][0]["name"] == "Python Starter"
+    assert (
+        payload["projects"][0]["path_with_namespace"]
+        == "professional-experience/examples/python-starter"
+    )
+
+
+def test_projects_route_requires_gitlab_configuration(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+            "GITLAB_CLIENT": FakeRouteGitLabClient(),
+        }
+    )
+
+    response = app.test_client().get("/groups/professional-experience/projects")
+
+    assert response.status_code == 503
+    assert response.get_json()["projects"] == []
+
+
+def test_projects_route_returns_safe_gitlab_error_diagnostics(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": FailingRouteGitLabClient(),
+        }
+    )
+
+    response = app.test_client().get("/groups/professional-experience/projects")
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "GitLab project browse failed."
+    assert payload["error_type"] == "RuntimeError"
+    assert "secret-token" not in response.get_data(as_text=True)
 
 
 def test_groups_route_returns_gitlab_error_diagnostics(tmp_path):
@@ -275,6 +360,17 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
     assert b"Assessment ID" in response.data
     assert b"Assessment display name" not in response.data
     assert b"This will be the name of the assessment group." in response.data
+    assert b"Base repository" in response.data
+    assert b'id="blank_base_repository"' in response.data
+    assert b'id="fork_base_repository"' in response.data
+    assert b'id="base_repository_full_path"' in response.data
+    assert b'name="base_repository_mode"' in response.data
+    assert b"Blank repository" in response.data
+    assert b"Fork repository" in response.data
+    assert b"Select repository to fork" in response.data
+    assert b"Template repository" not in response.data
+    assert b"loadCourseProjects" in response.data
+    assert b"Select assessment type" in response.data
     assert b'class="choice-stack assessment-mode-choices"' in response.data
     assert b"The group name from the CSV will be the project/repository name." in response.data
     assert (
@@ -384,6 +480,7 @@ team-01,Team 01,22049321
             "offering_name": "Autumn 2026",
             "assessment_path": "pa2621",
             "assessment_name": "PA2621",
+            "base_repository_mode": "blank",
             "csv_file": (BytesIO(csv_content), "projects.csv"),
         },
         content_type="multipart/form-data",
@@ -419,6 +516,7 @@ team-01,Team 01,22048668
             "parent_group_path": "new-course",
             "offering_path": "autumn-2026",
             "assessment_path": "pa2621",
+            "base_repository_mode": "blank",
             "csv_file": (BytesIO(csv_content), "projects.csv"),
         },
         content_type="multipart/form-data",
@@ -449,6 +547,7 @@ team-01,Team 01,22048668
             "parent_group_path": "professional-experience",
             "offering_path": "autumn-2026",
             "assessment_path": "pa2621",
+            "base_repository_mode": "blank",
             "csv_file": (BytesIO(csv_content), "projects.csv"),
         },
         content_type="multipart/form-data",

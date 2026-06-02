@@ -220,8 +220,14 @@
         margin-top: 16px;
       }
 
-      .assessment-mode-choices {
-        margin-top: 28px;
+      .assessment-type-section,
+      .base-repository-section {
+        margin-top: 24px;
+      }
+
+      .assessment-type-section > label,
+      .base-repository-section > label {
+        margin-top: 0;
       }
 
       .choice-row {
@@ -464,7 +470,37 @@
               </div>
             </div>
 
-            <div class="choice-stack assessment-mode-choices">
+            <div class="base-repository-section">
+              <label>Base repository</label>
+              <p class="muted">Choose whether each repository starts blank or is forked from an existing project.</p>
+              <div class="choice-stack">
+                <div class="choice-row">
+                  <input id="blank_base_repository" name="base_repository_mode" type="radio" value="blank">
+                  <div>
+                    <label for="blank_base_repository">Blank repository</label>
+                    <p class="muted">Create repositories without copying from an existing project.</p>
+                  </div>
+                </div>
+                <div class="choice-row">
+                  <input id="fork_base_repository" name="base_repository_mode" type="radio" value="fork">
+                  <div>
+                    <label for="fork_base_repository">Fork repository</label>
+                    <p class="muted">Create repositories by forking a previous project in this course.</p>
+                  </div>
+                </div>
+              </div>
+              <div id="fork_repository_fields" class="hidden">
+                <label for="base_repository_full_path">Select repository to fork</label>
+                <select id="base_repository_full_path" name="base_repository_full_path">
+                  <option value="">Select previous repository</option>
+                </select>
+                <p id="fork_repository_status" class="muted">Select an existing course to load repositories.</p>
+              </div>
+            </div>
+
+            <div class="assessment-type-section">
+              <label>Select assessment type</label>
+              <div class="choice-stack assessment-mode-choices">
               <div class="choice-row">
                 <input id="group_assessment" name="assessment_mode" type="radio" value="group">
                 <div>
@@ -478,6 +514,7 @@
                   <label for="individual_assessment">Individual Assessment</label>
                   <p class="muted">Each student ID from the CSV will get its own project/repository inside this assessment.</p>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -596,6 +633,10 @@
           const assessmentPath = document.getElementById("assessment_path");
           const assessmentName = document.getElementById("assessment_name");
           const assessmentModes = document.querySelectorAll("input[name='assessment_mode']");
+          const baseRepositoryModes = document.querySelectorAll("input[name='base_repository_mode']");
+          const forkRepositoryFields = document.getElementById("fork_repository_fields");
+          const baseRepositoryFullPath = document.getElementById("base_repository_full_path");
+          const forkRepositoryStatus = document.getElementById("fork_repository_status");
           const provisionSummary = document.getElementById("provision_summary");
           const csvFile = document.getElementById("csv_file");
           const csvSampleHelp = document.getElementById("csv_sample_help");
@@ -657,7 +698,27 @@
           function hasAssessmentSelection() {
             const hasOffering = Boolean(existingOffering.value || offeringPath.value.trim());
             const hasAssessment = Boolean(existingAssessment.value || assessmentPath.value.trim());
-            return hasCourseSelection() && hasOffering && hasAssessment && Boolean(selectedModeLabel());
+            return hasCourseSelection()
+              && hasOffering
+              && hasAssessment
+              && hasBaseRepositorySelection()
+              && Boolean(selectedModeLabel());
+          }
+
+          function hasBaseRepositorySelection() {
+            const selected = document.querySelector("input[name='base_repository_mode']:checked");
+            if (!selected) {
+              return false;
+            }
+            return selected.value === "blank" || Boolean(baseRepositoryFullPath.value);
+          }
+
+          function selectedBaseRepositoryLabel() {
+            const selected = document.querySelector("input[name='base_repository_mode']:checked");
+            if (!selected) {
+              return "";
+            }
+            return selected.value === "blank" ? "Blank repository" : `Fork from ${baseRepositoryFullPath.value}`;
           }
 
           function displayPath(path) {
@@ -694,6 +755,23 @@
             assessmentPath.value = "";
             assessmentName.value = "";
             assessmentDerivedPath.textContent = "Enter a display name";
+          }
+
+          function resetProjectSelect(label) {
+            resetSelect(baseRepositoryFullPath, label);
+            baseRepositoryFullPath.value = "";
+          }
+
+          function clearBaseRepository(resetProjects = false) {
+            for (const mode of baseRepositoryModes) {
+              mode.checked = false;
+            }
+            forkRepositoryFields.classList.add("hidden");
+            baseRepositoryFullPath.value = "";
+            if (resetProjects) {
+              resetProjectSelect("Select previous repository");
+              forkRepositoryStatus.textContent = "Select an existing course to load repositories.";
+            }
           }
 
           function updateStepState(section, fieldset, status, enabled, complete) {
@@ -733,6 +811,7 @@
               appendSummaryItem("Course", selectedCourseDisplay.value);
               appendSummaryItem("Offering", offering);
               appendSummaryItem("Assessment", assessment);
+              appendSummaryItem("Base", selectedBaseRepositoryLabel());
               appendSummaryItem("Mode", `${selectedModeArticle()} ${selectedModeLabel()}`);
             } else {
               provisionSummary.textContent = "Complete the assessment details to review the provision target.";
@@ -746,11 +825,13 @@
             newCoursePath.value = "";
             clearNewOffering();
             clearNewAssessment();
+            clearBaseRepository(true);
             resetSelect(existingOffering, "Loading offerings...");
             resetSelect(existingAssessment, "Select previous assessment");
             updateProgressiveWorkflow();
             assessmentSection.scrollIntoView({ behavior: "smooth", block: "start" });
             loadOfferings(path);
+            loadCourseProjects(path);
           }
 
           function appendCourseTree(course) {
@@ -817,12 +898,46 @@
               });
           }
 
+          function loadCourseProjects(coursePath) {
+            resetProjectSelect("Loading repositories...");
+            forkRepositoryStatus.textContent = "Loading repositories...";
+            fetchJson(`/groups/${encodedPath(coursePath)}/projects`)
+              .then(({ ok, payload }) => {
+                resetProjectSelect("Select previous repository");
+                if (!ok) {
+                  forkRepositoryStatus.textContent = payload.error_detail
+                    ? `${payload.error} ${payload.error_type || ""}: ${payload.error_detail}`
+                    : payload.error || "GitLab project browse failed.";
+                  updateProgressiveWorkflow();
+                  return;
+                }
+
+                for (const project of payload.projects) {
+                  appendOption(
+                    baseRepositoryFullPath,
+                    project.path_with_namespace,
+                    `${project.name} (${project.path_with_namespace})`
+                  );
+                }
+                forkRepositoryStatus.textContent = payload.projects.length
+                  ? "Repositories loaded."
+                  : "No repositories were returned for this course.";
+                updateProgressiveWorkflow();
+              })
+              .catch(() => {
+                resetProjectSelect("Select previous repository");
+                forkRepositoryStatus.textContent = "GitLab project browse timed out or failed.";
+                updateProgressiveWorkflow();
+              });
+          }
+
           createNewCourse.addEventListener("click", () => {
             parentGroupPath.value = "";
             selectedCourseDisplay.value = "New course";
             newCourseFields.classList.remove("hidden");
             clearNewOffering();
             clearNewAssessment();
+            clearBaseRepository(true);
             resetSelect(existingOffering, "Select previous offering");
             resetSelect(existingAssessment, "Select previous assessment");
             updateProgressiveWorkflow();
@@ -838,6 +953,7 @@
 
           existingOffering.addEventListener("change", () => {
             clearNewAssessment();
+            clearBaseRepository();
             resetSelect(existingAssessment, "Select previous assessment");
             if (existingOffering.value) {
               clearNewOffering();
@@ -849,6 +965,7 @@
           createNewOffering.addEventListener("click", () => {
             existingOffering.value = "";
             clearNewAssessment();
+            clearBaseRepository();
             resetSelect(existingAssessment, "Select previous assessment");
             newOfferingFields.classList.remove("hidden");
             newOfferingName.focus();
@@ -868,11 +985,13 @@
             if (existingAssessment.value) {
               clearNewAssessment();
             }
+            clearBaseRepository();
             updateProgressiveWorkflow();
           });
 
           createNewAssessment.addEventListener("click", () => {
             existingAssessment.value = "";
+            clearBaseRepository();
             newAssessmentFields.classList.remove("hidden");
             newAssessmentName.focus();
             updateProgressiveWorkflow();
@@ -891,6 +1010,17 @@
           for (const mode of assessmentModes) {
             mode.addEventListener("change", updateProgressiveWorkflow);
           }
+          for (const mode of baseRepositoryModes) {
+            mode.addEventListener("change", () => {
+              const isFork = mode.checked && mode.value === "fork";
+              forkRepositoryFields.classList.toggle("hidden", !isFork);
+              if (!isFork) {
+                baseRepositoryFullPath.value = "";
+              }
+              updateProgressiveWorkflow();
+            });
+          }
+          baseRepositoryFullPath.addEventListener("change", updateProgressiveWorkflow);
           {% if config.gitlab_configured %}
             fetchJson("/groups")
             .then(({ ok, payload }) => {

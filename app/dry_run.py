@@ -19,6 +19,9 @@ class GitLabReadModel(Protocol):
     def list_group_projects(self, full_path: str) -> list[GitLabProjectSummary]:
         ...
 
+    def get_project_summary(self, full_path: str) -> GitLabProjectSummary | None:
+        ...
+
     def lookup_users(self, usernames: tuple[str, ...]) -> dict[str, GitLabUserLookup]:
         ...
 
@@ -30,6 +33,8 @@ class DryRunSelection:
     offering_name: str
     assessment_path: str
     assessment_name: str
+    base_repository_mode: str
+    base_repository_full_path: str
 
     @property
     def offering_full_path(self) -> str:
@@ -50,6 +55,8 @@ def build_dry_run_report(
     warnings = list(validation.warnings)
 
     errors.extend(_selection_errors(selection))
+    base_repository, base_repository_errors = _base_repository(selection, gitlab)
+    errors.extend(base_repository_errors)
     for row in rows:
         errors.extend(validate_gitlab_path_component(row.project_path, "Project path"))
 
@@ -122,6 +129,7 @@ def build_dry_run_report(
                 missing_action="create_later",
             ),
         },
+        "base_repository": base_repository,
         "projects": [
             _project_plan(selection.assessment_full_path, row, existing_projects.get(row.project_path))
             for row in rows
@@ -163,7 +171,70 @@ def _selection_errors(
     ):
         errors.extend(validate_gitlab_path_component(path, label))
 
+    if selection.base_repository_mode not in {"blank", "fork"}:
+        errors.append("Base repository selection is required.")
+    elif (
+        selection.base_repository_mode == "fork"
+        and not selection.base_repository_full_path
+    ):
+        errors.append("Fork source repository is required.")
+
     return errors
+
+
+def _base_repository(
+    selection: DryRunSelection,
+    gitlab: GitLabReadModel,
+) -> tuple[dict[str, object], list[str]]:
+    if selection.base_repository_mode == "blank":
+        return (
+            {
+                "mode": "blank",
+                "name": "Blank repository",
+                "full_path": None,
+                "exists": True,
+                "gitlab": None,
+            },
+            [],
+        )
+
+    if selection.base_repository_mode != "fork":
+        return (
+            {
+                "mode": selection.base_repository_mode,
+                "name": "",
+                "full_path": None,
+                "exists": False,
+                "gitlab": None,
+            },
+            [],
+        )
+
+    full_path = selection.base_repository_full_path
+    if not full_path:
+        return (
+            {
+                "mode": "fork",
+                "name": "",
+                "full_path": None,
+                "exists": False,
+                "gitlab": None,
+            },
+            [],
+        )
+
+    project = gitlab.get_project_summary(full_path)
+    errors = [] if project else [f"Fork source repository not found: {full_path}"]
+    return (
+        {
+            "mode": "fork",
+            "name": project.name if project else full_path,
+            "full_path": full_path,
+            "exists": project is not None,
+            "gitlab": asdict(project) if project else None,
+        },
+        errors,
+    )
 
 
 def _target_group(

@@ -111,6 +111,14 @@ class GitLabClient:
             for assessment in offering.subgroups.list(get_all=True)
         ]
 
+    def list_course_projects(self, course_path: str) -> list[GitLabProjectSummary]:
+        client = self._make_client()
+        course = client.groups.get(course_path)
+        return [
+            self._project_summary(project)
+            for project in course.projects.list(get_all=True, include_subgroups=True)
+        ]
+
     def get_group_summary(self, full_path: str) -> GitLabGroupSummary | None:
         client = self._make_client()
         try:
@@ -119,6 +127,15 @@ class GitLabClient:
             return None
 
         return self._group_summary(group)
+
+    def get_project_summary(self, full_path: str) -> GitLabProjectSummary | None:
+        client = self._make_client()
+        try:
+            project = client.projects.get(full_path)
+        except Exception:
+            return None
+
+        return self._project_summary(project)
 
     def list_group_projects(self, full_path: str) -> list[GitLabProjectSummary]:
         client = self._make_client()

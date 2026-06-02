@@ -63,6 +63,13 @@ class FakeGitLab:
             subgroups=FakeManager([]),
             projects=FakeManager([]),
         )
+        fork_source_project = FakeObject(
+            id=20,
+            name="Python Starter",
+            path="python-starter",
+            path_with_namespace="professional-experience/examples/python-starter",
+            web_url="https://gitlab.example.edu.au/professional-experience/examples/python-starter",
+        )
         offering = FakeObject(
             id=2,
             name="Autumn 2026",
@@ -87,8 +94,9 @@ class FakeGitLab:
             updated_at="2026-01-02T00:00:00Z",
             projects_count=0,
             subgroups=FakeManager([offering]),
-            projects=FakeManager([]),
+            projects=FakeManager([fork_source_project]),
         )
+        self.fork_source_project = fork_source_project
         self.groups = FakeGroupsManager(
             {
                 "professional-experience": parent,
@@ -99,6 +107,11 @@ class FakeGitLab:
             }
         )
         self.users = FakeUsersManager()
+        self.projects = FakeGroupsManager(
+            {
+                "professional-experience/examples/python-starter": fork_source_project,
+            }
+        )
 
 
 def test_gitlab_client_browses_head_course_groups(monkeypatch):
@@ -134,6 +147,32 @@ def test_gitlab_client_lists_assessments_for_one_offering(monkeypatch):
 
     assert assessments[0].full_path == "professional-experience/autumn-2026/pa2621"
     assert fake_gitlab.groups.calls == ["professional-experience/autumn-2026"]
+
+
+def test_gitlab_client_lists_course_projects_including_subgroups(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    projects = client.list_course_projects("professional-experience")
+
+    assert projects[0].path_with_namespace == "professional-experience/examples/python-starter"
+    assert fake_gitlab.groups.calls == ["professional-experience"]
+    assert fake_gitlab.groups.objects["professional-experience"].projects.calls == [
+        {"get_all": True, "include_subgroups": True}
+    ]
+
+
+def test_gitlab_client_get_project_summary_returns_project(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    project = client.get_project_summary("professional-experience/examples/python-starter")
+
+    assert project is not None
+    assert project.name == "Python Starter"
+    assert fake_gitlab.projects.calls == ["professional-experience/examples/python-starter"]
 
 
 def test_gitlab_client_looks_up_users_by_exact_username(monkeypatch):

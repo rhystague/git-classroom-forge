@@ -56,6 +56,13 @@ class FakeGitLabReadModel:
                 )
             ]
         }
+        self.fork_source_project = GitLabProjectSummary(
+            id=20,
+            name="Python Starter",
+            path="python-starter",
+            path_with_namespace="professional-experience/examples/python-starter",
+            web_url="https://gitlab.example.edu.au/professional-experience/examples/python-starter",
+        )
         self.users = {
             "22048668": GitLabUserLookup(
                 username="22048668",
@@ -79,6 +86,11 @@ class FakeGitLabReadModel:
     def list_group_projects(self, full_path):
         return self.projects.get(full_path, [])
 
+    def get_project_summary(self, full_path):
+        if full_path == self.fork_source_project.path_with_namespace:
+            return self.fork_source_project
+        return None
+
     def lookup_users(self, usernames):
         return {username: self.users[username] for username in usernames}
 
@@ -97,6 +109,8 @@ def test_build_dry_run_report_marks_reused_projects_and_missing_users():
         offering_name="Autumn 2026",
         assessment_path="pa2621",
         assessment_name="PA2621",
+        base_repository_mode="blank",
+        base_repository_full_path="",
     )
 
     report = build_dry_run_report(
@@ -109,6 +123,13 @@ def test_build_dry_run_report_marks_reused_projects_and_missing_users():
     assert report["valid"] is False
     assert report["target"]["offering"]["action"] == "reuse"
     assert report["target"]["assessment"]["action"] == "reuse"
+    assert report["base_repository"] == {
+        "mode": "blank",
+        "name": "Blank repository",
+        "full_path": None,
+        "exists": True,
+        "gitlab": None,
+    }
     assert report["projects"][0]["action"] == "reuse"
     assert report["projects"][0]["exists"] is True
     assert report["students"]["22048668"]["exists"] is True
@@ -130,6 +151,8 @@ def test_build_dry_run_report_allows_new_parent_group_path():
         offering_name="Autumn 2026",
         assessment_path="pa2621",
         assessment_name="PA2621",
+        base_repository_mode="blank",
+        base_repository_full_path="",
     )
 
     report = build_dry_run_report(
@@ -141,6 +164,128 @@ def test_build_dry_run_report_allows_new_parent_group_path():
     assert report["valid"] is True
     assert report["target"]["parent"]["action"] == "create_later"
     assert report["target"]["assessment"]["full_path"] == "new-course/autumn-2026/pa2621"
+
+
+def test_build_dry_run_report_includes_fork_base_repository():
+    rows = [
+        ProjectCsvRow(
+            project_path="team-02",
+            project_name="Team 02",
+            student_ids=["22048668"],
+        )
+    ]
+    selection = DryRunSelection(
+        parent_group_path="professional-experience",
+        offering_path="autumn-2026",
+        offering_name="Autumn 2026",
+        assessment_path="pa2621",
+        assessment_name="PA2621",
+        base_repository_mode="fork",
+        base_repository_full_path="professional-experience/examples/python-starter",
+    )
+
+    report = build_dry_run_report(
+        rows=rows,
+        selection=selection,
+        gitlab=FakeGitLabReadModel(),
+    )
+
+    assert report["valid"] is True
+    assert report["base_repository"]["mode"] == "fork"
+    assert report["base_repository"]["name"] == "Python Starter"
+    assert (
+        report["base_repository"]["full_path"]
+        == "professional-experience/examples/python-starter"
+    )
+    assert report["base_repository"]["exists"] is True
+
+
+def test_build_dry_run_report_requires_base_repository_mode():
+    rows = [
+        ProjectCsvRow(
+            project_path="team-02",
+            project_name="Team 02",
+            student_ids=["22048668"],
+        )
+    ]
+    selection = DryRunSelection(
+        parent_group_path="professional-experience",
+        offering_path="autumn-2026",
+        offering_name="Autumn 2026",
+        assessment_path="pa2621",
+        assessment_name="PA2621",
+        base_repository_mode="",
+        base_repository_full_path="",
+    )
+
+    report = build_dry_run_report(
+        rows=rows,
+        selection=selection,
+        gitlab=FakeGitLabReadModel(),
+    )
+
+    assert report["valid"] is False
+    assert "Base repository selection is required." in report["errors"]
+
+
+def test_build_dry_run_report_requires_fork_repository_path():
+    rows = [
+        ProjectCsvRow(
+            project_path="team-02",
+            project_name="Team 02",
+            student_ids=["22048668"],
+        )
+    ]
+    selection = DryRunSelection(
+        parent_group_path="professional-experience",
+        offering_path="autumn-2026",
+        offering_name="Autumn 2026",
+        assessment_path="pa2621",
+        assessment_name="PA2621",
+        base_repository_mode="fork",
+        base_repository_full_path="",
+    )
+
+    report = build_dry_run_report(
+        rows=rows,
+        selection=selection,
+        gitlab=FakeGitLabReadModel(),
+    )
+
+    assert report["valid"] is False
+    assert "Fork source repository is required." in report["errors"]
+
+
+def test_build_dry_run_report_requires_existing_fork_repository():
+    rows = [
+        ProjectCsvRow(
+            project_path="team-02",
+            project_name="Team 02",
+            student_ids=["22048668"],
+        )
+    ]
+    selection = DryRunSelection(
+        parent_group_path="professional-experience",
+        offering_path="autumn-2026",
+        offering_name="Autumn 2026",
+        assessment_path="pa2621",
+        assessment_name="PA2621",
+        base_repository_mode="fork",
+        base_repository_full_path="professional-experience/examples/missing",
+    )
+
+    report = build_dry_run_report(
+        rows=rows,
+        selection=selection,
+        gitlab=FakeGitLabReadModel(),
+    )
+
+    assert report["valid"] is False
+    assert (
+        "Fork source repository not found: professional-experience/examples/missing"
+        in report["errors"]
+    )
+    assert report["base_repository"]["exists"] is False
 
 
 def test_persist_dry_run_snapshot_writes_report_with_run_id(tmp_path):
