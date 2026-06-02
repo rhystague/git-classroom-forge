@@ -25,6 +25,51 @@ def test_health_route_returns_json_status(tmp_path):
     assert response.get_json() == {"status": "ok", "service": "class-git-forge"}
 
 
+def test_index_renders_provider_landing_tiles(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+        }
+    )
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    assert b"Git Classroom Forge" in response.data
+    assert b"GitLab Provision" in response.data
+    assert b'href="/gitlab-provision"' in response.data
+    assert b'src="/static/images/gitlab.svg"' in response.data
+    assert b"GitHub" in response.data
+    assert b"Yet to come" in response.data
+    assert b'aria-disabled="true"' in response.data
+    assert b'src="/static/images/github.svg"' in response.data
+    assert b'href="/validate"' not in response.data
+
+
+def test_gitlab_provision_explanation_links_to_validate(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+        }
+    )
+
+    response = app.test_client().get("/gitlab-provision")
+
+    assert response.status_code == 200
+    assert b"GitLab Assessment Provisioning" in response.data
+    assert b"How assessments will be generated" in response.data
+    assert b"Choose a course" in response.data
+    assert b"Choose an offering" in response.data
+    assert b"Choose or create an assessment name" in response.data
+    assert b"Choose a base repository" in response.data
+    assert b"Choose individual or group assessment" in response.data
+    assert b"Upload the roster CSV and run the dry run" in response.data
+    assert b'href="/validate"' in response.data
+    assert b"Start GitLab Provisioning" in response.data
+
+
 class FakeRouteGitLabClient:
     def __init__(self):
         self.browse_calls = 0

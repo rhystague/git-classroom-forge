@@ -49,7 +49,12 @@ CSV_SAMPLES = {
 
 @bp.get("/")
 def index():
-    return _render_validate()
+    return render_template("landing.html")
+
+
+@bp.get("/gitlab-provision")
+def gitlab_provision():
+    return render_template("gitlab_provision.html")
 
 
 @bp.get("/health")

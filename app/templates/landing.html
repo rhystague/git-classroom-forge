@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Git Classroom Forge</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+      }
+
+      body {
+        margin: 0;
+        background: #f6f7f9;
+        color: #1f2933;
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+
+      h1 {
+        margin: 0;
+      }
+
+      .intro {
+        color: #52606d;
+        margin: 8px 0 0;
+        max-width: 680px;
+      }
+
+      .tile-grid {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        margin-top: 30px;
+      }
+
+      .integration-tile {
+        background: #ffffff;
+        border: 1px solid #d8dee8;
+        border-radius: 6px;
+        box-sizing: border-box;
+        color: #1f2933;
+        display: grid;
+        min-height: 260px;
+        padding: 24px;
+        text-decoration: none;
+      }
+
+      .integration-tile:hover,
+      .integration-tile:focus {
+        border-color: #A71D2A;
+        box-shadow: 0 10px 28px rgba(31, 41, 51, 0.12);
+        outline: none;
+      }
+
+      .integration-tile-disabled {
+        background: #1f2933;
+        border-color: #111827;
+        color: #cbd5e1;
+        cursor: not-allowed;
+        opacity: 0.76;
+      }
+
+      .tile-icon {
+        align-items: center;
+        background: #f8fafc;
+        border: 1px solid #d8dee8;
+        border-radius: 6px;
+        display: inline-flex;
+        height: 72px;
+        justify-content: center;
+        width: 72px;
+      }
+
+      .integration-tile-disabled .tile-icon {
+        background: #ffffff;
+        border-color: #334155;
+      }
+
+      .tile-icon img {
+        display: block;
+        height: 46px;
+        width: 46px;
+      }
+
+      .tile-body {
+        align-self: end;
+      }
+
+      .tile-body h2 {
+        font-size: 1.45rem;
+        margin: 0;
+      }
+
+      .tile-body p {
+        color: #52606d;
+        margin: 8px 0 0;
+      }
+
+      .integration-tile-disabled .tile-body p {
+        color: #94a3b8;
+      }
+
+      .tile-status {
+        color: #A71D2A;
+        display: inline-block;
+        font-weight: 700;
+        margin-top: 16px;
+      }
+
+      .integration-tile-disabled .tile-status {
+        color: #e5e7eb;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Git Classroom Forge</h1>
+      <p class="intro">Choose a provisioning path for course assessment repositories.</p>
+
+      <div class="tile-grid" aria-label="Provisioning providers">
+        <a class="integration-tile" href="/gitlab-provision">
+          <span class="tile-icon">
+            <img src="{{ url_for('static', filename='images/gitlab.svg') }}" alt="GitLab logo">
+          </span>
+          <span class="tile-body">
+            <h2>GitLab Provision</h2>
+            <p>Create and review GitLab course assessment repositories.</p>
+            <span class="tile-status">Open workflow</span>
+          </span>
+        </a>
+
+        <div class="integration-tile integration-tile-disabled" aria-disabled="true">
+          <span class="tile-icon">
+            <img src="{{ url_for('static', filename='images/github.svg') }}" alt="GitHub logo">
+          </span>
+          <span class="tile-body">
+            <h2>GitHub</h2>
+            <p>GitHub assessment provisioning is not available yet.</p>
+            <span class="tile-status">Yet to come</span>
+          </span>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
