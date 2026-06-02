@@ -350,6 +350,10 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
     assert b'id="provision_step" disabled' in response.data
     assert b"Assessment Provisioning" in response.data
     assert b"Provision Details" in response.data
+    assert (
+        b"Confirm the target, upload the roster CSV, then run a non-destructive "
+        b"dry run before provisioning."
+    ) in response.data
     assert b"Choose an existing course or create a new course path." not in response.data
     assert b"#A71D2A" in response.data
     assert b"#14532d" not in response.data
