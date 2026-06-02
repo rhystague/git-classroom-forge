@@ -624,6 +624,16 @@ team-01,Team 01,22048668
     assert b'class="status-chip is-valid"' in response.data
     assert b"Valid" in response.data
     assert b'id="provision_button"' in response.data
+    assert b'id="cancel_button"' in response.data
+    assert b'href="/validate"' in response.data
+    assert b'id="provision_form"' in response.data
+    assert b'id="provision_button_label"' in response.data
+    assert b'id="provision_button_spinner"' in response.data
+    assert b".spinner.hidden" in response.data
+    assert b'id="provision_progress"' in response.data
+    assert b"Provisioning..." in response.data
+    assert b'aria-live="polite"' in response.data
+    assert b"addEventListener(\"submit\"" in response.data
     assert b'action="/provision"' in response.data
 
 

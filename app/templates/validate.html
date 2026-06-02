@@ -88,6 +88,24 @@
         cursor: not-allowed;
       }
 
+      .button-link {
+        box-sizing: border-box;
+        border: 1px solid #d8dee8;
+        border-radius: 4px;
+        color: #1f2933;
+        display: inline-block;
+        font: inherit;
+        font-weight: 700;
+        margin-top: 18px;
+        padding: 10px 12px;
+        text-decoration: none;
+      }
+
+      .button-link:hover,
+      .button-link:focus {
+        background: #f8fafc;
+      }
+
       .text-button {
         background: transparent;
         color: #A71D2A;
@@ -452,9 +470,45 @@
       }
 
       .provision-action {
+        align-items: center;
         border-top: 1px solid #d8dee8;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
         margin-top: 4px;
         padding-top: 16px;
+      }
+
+      .provision-action button {
+        align-items: center;
+        display: inline-flex;
+        gap: 8px;
+      }
+
+      .spinner {
+        animation: spin 0.8s linear infinite;
+        border: 2px solid rgba(255, 255, 255, 0.45);
+        border-top-color: #ffffff;
+        border-radius: 999px;
+        display: inline-block;
+        height: 16px;
+        width: 16px;
+      }
+
+      .spinner.hidden {
+        display: none;
+      }
+
+      .provision-progress {
+        color: #52606d;
+        font-weight: 700;
+        margin: 18px 0 0;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
     </style>
   </head>
@@ -761,9 +815,16 @@
           </div>
           {{ result_summary(dry_run) }}
           {% if dry_run.valid %}
-            <form class="provision-action" action="/provision" method="post">
+            <form id="provision_form" class="provision-action" action="/provision" method="post">
               <input name="run_id" type="hidden" value="{{ dry_run.run_id }}">
-              <button id="provision_button" type="submit">Provision</button>
+              <a id="cancel_button" class="button-link" href="/validate">Cancel</a>
+              <button id="provision_button" type="submit">
+                <span id="provision_button_spinner" class="spinner hidden" aria-hidden="true"></span>
+                <span id="provision_button_label">Provision</span>
+              </button>
+              <p id="provision_progress" class="provision-progress hidden" aria-live="polite">
+                Provisioning...
+              </p>
             </form>
           {% endif %}
           {% if dry_run.errors %}
@@ -811,6 +872,23 @@
           {% endif %}
           {{ membership_actions(provisioning) }}
         </section>
+      {% endif %}
+
+      {% if dry_run and dry_run.valid and not provisioning %}
+      <script>
+        const provisionForm = document.getElementById("provision_form");
+        const provisionButton = document.getElementById("provision_button");
+        const provisionButtonLabel = document.getElementById("provision_button_label");
+        const provisionButtonSpinner = document.getElementById("provision_button_spinner");
+        const provisionProgress = document.getElementById("provision_progress");
+
+        provisionForm.addEventListener("submit", () => {
+          provisionButton.disabled = true;
+          provisionButtonLabel.textContent = "Provisioning...";
+          provisionButtonSpinner.classList.remove("hidden");
+          provisionProgress.classList.remove("hidden");
+        });
+      </script>
       {% endif %}
 
       {% if not dry_run %}
