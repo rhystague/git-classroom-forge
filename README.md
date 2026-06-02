@@ -91,7 +91,7 @@ Group-based projects:
 
 ```csv
 project_path,project_name,student_id
-team-01,PA2601,22048668
+team-01,PA2601 Team 01,22048668
 team-01,PA2601 Team 01,22049321
 team-01,PA2601 Team 01,22050119
 team-02,PA2602 Team 02,22051234
