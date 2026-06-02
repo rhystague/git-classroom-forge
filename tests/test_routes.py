@@ -28,6 +28,7 @@ def test_health_route_returns_json_status(tmp_path):
 class FakeRouteGitLabClient:
     def __init__(self):
         self.browse_calls = 0
+        self.write_calls = []
         self.parent = GitLabGroupSummary(
             id=1,
             name="Professional Experience",
@@ -71,6 +72,7 @@ class FakeRouteGitLabClient:
             path_with_namespace="professional-experience/examples/python-starter",
             web_url="https://gitlab.example.edu.au/professional-experience/examples/python-starter",
         )
+        self.projects = {}
 
     def browse_head_course_groups(self):
         self.browse_calls += 1
@@ -118,6 +120,60 @@ class FakeRouteGitLabClient:
             )
             for username in usernames
         }
+
+    def ensure_group(self, *, full_path, name, parent_full_path=None):
+        self.write_calls.append(("ensure_group", full_path, name, parent_full_path))
+        if full_path == self.parent.full_path:
+            return self.parent
+        if full_path == self.offering.full_path:
+            return self.offering
+        if full_path == self.assessment.full_path:
+            return self.assessment
+        return GitLabGroupSummary(
+            id=len(self.write_calls) + 100,
+            name=name,
+            path=full_path.rsplit("/", 1)[-1],
+            full_path=full_path,
+            parent_id=None,
+            web_url=f"https://gitlab.example.edu.au/groups/{full_path}",
+            subgroup_count=0,
+            project_count=0,
+            created_at=None,
+            updated_at=None,
+        )
+
+    def create_blank_project(self, *, namespace_full_path, name, path):
+        self.write_calls.append(("create_blank_project", namespace_full_path, name, path))
+        full_path = f"{namespace_full_path}/{path}"
+        project = GitLabProjectSummary(
+            id=len(self.write_calls) + 200,
+            name=name,
+            path=path,
+            path_with_namespace=full_path,
+            web_url=f"https://gitlab.example.edu.au/{full_path}",
+        )
+        self.projects[full_path] = project
+        return project
+
+    def fork_project(self, *, source_full_path, namespace_full_path, name, path):
+        self.write_calls.append(("fork_project", source_full_path, namespace_full_path, name, path))
+        return self.create_blank_project(
+            namespace_full_path=namespace_full_path,
+            name=name,
+            path=path,
+        )
+
+    def add_project_member(self, *, project_full_path, user_id, access_level):
+        self.write_calls.append(("add_project_member", project_full_path, user_id, access_level))
+
+    def update_project_member(self, *, project_full_path, user_id, access_level):
+        self.write_calls.append(("update_project_member", project_full_path, user_id, access_level))
+
+    def create_project_invitation(self, *, project_full_path, email, access_level):
+        self.write_calls.append(("create_project_invitation", project_full_path, email, access_level))
+
+    def update_project_invitation(self, *, project_full_path, email, access_level):
+        self.write_calls.append(("update_project_invitation", project_full_path, email, access_level))
 
 
 class FailingRouteGitLabClient:
@@ -354,9 +410,12 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
         b"Confirm the target, upload the roster CSV, then run a non-destructive "
         b"dry run before provisioning."
     ) in response.data
+    assert (
+        b"Review rosters, validate a dry run, then provision GitLab course repositories."
+    ) in response.data
     assert b"Choose an existing course or create a new course path." not in response.data
     assert b"#A71D2A" in response.data
-    assert b"#14532d" not in response.data
+    assert b"#14532d" in response.data
     assert b'class="assessment-flow"' in response.data
     assert b'class="assessment-field-group"' in response.data
     assert b'<div class="grid">' not in response.data
@@ -512,7 +571,7 @@ team-01,Team 01,22049321
     assert b"Perform Dry Run" not in response.data
     assert b"<pre>" not in response.data
     assert b'"mode": "dry-run"' not in response.data
-    assert b'id="provision_button"' not in response.data
+    assert b'id="provision_button"' in response.data
     assert response.data.count(b"Team 01 (new-course") == 0
     assert response.data.count(b"Team 01 (professional-experience/autumn-2026/pa2621/team-01)") == 1
     assert b"22048668@student.university.edu.au" in response.data
@@ -526,6 +585,171 @@ team-01,Team 01,22049321
     assert len(report["projects"]) == 1
     assert len(report["projects"][0]["membership_actions"]) == 2
     assert report["projects"][0]["membership_actions"][0]["action"] == "add_member_after_project_create"
+
+
+def test_valid_dry_run_renders_status_chip_and_provision_button(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": FakeRouteGitLabClient(),
+        }
+    )
+    csv_content = b"""project_path,project_name,student_id
+team-01,Team 01,22048668
+"""
+
+    response = app.test_client().post(
+        "/dry-run",
+        data={
+            "parent_group_path": "professional-experience",
+            "offering_path": "autumn-2026",
+            "offering_name": "Autumn 2026",
+            "assessment_path": "pa2621",
+            "assessment_name": "PA2621",
+            "base_repository_mode": "blank",
+            "assessment_mode": "group",
+            "csv_file": (BytesIO(csv_content), "projects.csv"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert b'class="status-chip is-valid"' in response.data
+    assert b"Valid" in response.data
+    assert b'id="provision_button"' in response.data
+    assert b'action="/provision"' in response.data
+
+
+def test_invalid_dry_run_renders_invalid_chip_without_provision_button(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": FakeRouteGitLabClient(),
+        }
+    )
+    csv_content = b"""project_path,project_name,student_id
+team-01,Team 01,22048668
+"""
+
+    response = app.test_client().post(
+        "/dry-run",
+        data={
+            "parent_group_path": "professional-experience",
+            "offering_path": "autumn-2026",
+            "assessment_path": "pa2621",
+            "assessment_mode": "group",
+            "csv_file": (BytesIO(csv_content), "projects.csv"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 422
+    assert b'class="status-chip is-invalid"' in response.data
+    assert b"Invalid" in response.data
+    assert b'id="provision_button"' not in response.data
+
+
+def test_provision_route_loads_snapshot_persists_report_and_renders_result(tmp_path):
+    gitlab = FakeRouteGitLabClient()
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": gitlab,
+        }
+    )
+    csv_content = b"""project_path,project_name,student_id
+team-01,Team 01,22048668
+"""
+    client = app.test_client()
+    dry_run_response = client.post(
+        "/dry-run",
+        data={
+            "parent_group_path": "professional-experience",
+            "offering_path": "autumn-2026",
+            "assessment_path": "pa2621",
+            "base_repository_mode": "blank",
+            "assessment_mode": "group",
+            "csv_file": (BytesIO(csv_content), "projects.csv"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert dry_run_response.status_code == 200
+    dry_run_file = next((tmp_path / "reports").glob("*-dry-run.json"))
+    run_id = json.loads(dry_run_file.read_text(encoding="utf-8"))["run_id"]
+
+    response = client.post("/provision", data={"run_id": run_id})
+
+    assert response.status_code == 200
+    assert b"Dry-run result" in response.data
+    assert b"Provisioning result" in response.data
+    assert b'class="status-chip is-valid"' in response.data
+    assert b"Provision" in response.data
+    assert any(call[0] == "create_blank_project" for call in gitlab.write_calls)
+    provision_files = list((tmp_path / "reports").glob("*-provision.json"))
+    assert len(provision_files) == 1
+    provision = json.loads(provision_files[0].read_text(encoding="utf-8"))
+    assert provision["mode"] == "provision"
+    assert provision["source_run_id"] == run_id
+    audit_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in (tmp_path / "logs").glob("*.json")
+    )
+    assert "secret-token" not in audit_text
+
+
+def test_provision_route_requires_gitlab_configuration(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+        }
+    )
+
+    response = app.test_client().post("/provision", data={"run_id": "missing"})
+
+    assert response.status_code == 503
+    assert b"GITLAB_URL and GITLAB_TOKEN must be set before provisioning." in response.data
+
+
+def test_provision_route_rejects_missing_snapshot(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": FakeRouteGitLabClient(),
+        }
+    )
+
+    response = app.test_client().post("/provision", data={"run_id": "missing"})
+
+    assert response.status_code == 400
+    assert b"Dry-run snapshot was not found." in response.data
 
 
 def test_dry_run_route_allows_new_course_path(tmp_path):

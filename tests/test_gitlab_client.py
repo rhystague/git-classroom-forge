@@ -11,10 +11,27 @@ class FakeManager:
         self.calls.append(kwargs)
         return self.items
 
+    def create(self, payload):
+        self.calls.append(("create", payload))
+        created = FakeObject(id=len(self.items) + 1000, **payload)
+        self.items.append(created)
+        return created
+
+    def update(self, key, payload):
+        self.calls.append(("update", key, payload))
+        return FakeObject(id=key, **payload)
+
+    def get(self, key):
+        self.calls.append(("get", key))
+        return FakeObject(id=key, access_level=20, saved=False)
+
 
 class FakeObject:
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
+
+    def save(self):
+        self.saved = True
 
 
 class FakeGroupsManager:
@@ -33,6 +50,32 @@ class FakeGroupsManager:
             for group in self.objects.values()
             if getattr(group, "parent_id", None) is None
         ]
+
+    def create(self, payload):
+        self.calls.append(("create", payload))
+        full_path = payload["path"]
+        if payload.get("parent_id"):
+            parent = next(
+                group
+                for group in self.objects.values()
+                if getattr(group, "id", None) == payload["parent_id"]
+            )
+            full_path = f"{parent.full_path}/{payload['path']}"
+        int_keys = [key for key in self.objects if isinstance(key, int)]
+        created = FakeObject(
+            id=(max(int_keys) + 1) if int_keys else 1000,
+            name=payload["name"],
+            path=payload["path"],
+            full_path=full_path,
+            parent_id=payload.get("parent_id"),
+            web_url=f"https://gitlab.example.edu.au/groups/{full_path}",
+            created_at=None,
+            updated_at=None,
+            projects_count=0,
+        )
+        self.objects[full_path] = created
+        self.objects[created.id] = created
+        return created
 
 
 class FakeUsersManager:
@@ -69,6 +112,7 @@ class FakeGitLab:
             path="python-starter",
             path_with_namespace="professional-experience/examples/python-starter",
             web_url="https://gitlab.example.edu.au/professional-experience/examples/python-starter",
+            forks=FakeManager([]),
             members=FakeManager(
                 [
                     FakeObject(
@@ -274,3 +318,123 @@ def test_gitlab_client_sets_short_api_timeout(monkeypatch):
     GitLabClient(AppConfig.from_env({}))._make_client()
 
     assert created["timeout"] == 5
+
+
+def test_gitlab_client_ensures_missing_top_level_group(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    created = client.ensure_group(
+        full_path="new-course",
+        name="New Course",
+        parent_full_path=None,
+    )
+
+    assert created.full_path == "new-course"
+    assert ("create", {"name": "New Course", "path": "new-course"}) in fake_gitlab.groups.calls
+
+
+def test_gitlab_client_ensures_missing_subgroup(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    created = client.ensure_group(
+        full_path="professional-experience/pa2623",
+        name="PA2623",
+        parent_full_path="professional-experience",
+    )
+
+    assert created.full_path == "professional-experience/pa2623"
+    assert (
+        "create",
+        {"name": "PA2623", "path": "pa2623", "parent_id": 1},
+    ) in fake_gitlab.groups.calls
+
+
+def test_gitlab_client_creates_blank_project_in_namespace(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    client.create_blank_project(
+        namespace_full_path="professional-experience/autumn-2026/pa2621",
+        name="Team 01",
+        path="team-01",
+    )
+
+    assert (
+        "create",
+        {"name": "Team 01", "path": "team-01", "namespace_id": 3},
+    ) in fake_gitlab.projects.calls
+
+
+def test_gitlab_client_forks_project_with_namespace_name_and_path(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    client.fork_project(
+        source_full_path="professional-experience/examples/python-starter",
+        namespace_full_path="professional-experience/autumn-2026/pa2621",
+        name="Team 01",
+        path="team-01",
+    )
+
+    assert fake_gitlab.fork_source_project.forks.calls == [
+        (
+            "create",
+            {"namespace_id": 3, "name": "Team 01", "path": "team-01"},
+        )
+    ]
+
+
+def test_gitlab_client_adds_and_updates_project_members(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    client.add_project_member(
+        project_full_path="professional-experience/examples/python-starter",
+        user_id=100,
+        access_level=30,
+    )
+    client.update_project_member(
+        project_full_path="professional-experience/examples/python-starter",
+        user_id=100,
+        access_level=30,
+    )
+
+    assert (
+        "create",
+        {"user_id": 100, "access_level": 30},
+    ) in fake_gitlab.fork_source_project.members.calls
+    assert ("get", 100) in fake_gitlab.fork_source_project.members.calls
+
+
+def test_gitlab_client_creates_and_updates_project_invitations(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    client.create_project_invitation(
+        project_full_path="professional-experience/examples/python-starter",
+        email="student@example.edu.au",
+        access_level=30,
+    )
+    client.update_project_invitation(
+        project_full_path="professional-experience/examples/python-starter",
+        email="student@example.edu.au",
+        access_level=30,
+    )
+
+    assert (
+        "create",
+        {"email": "student@example.edu.au", "access_level": 30},
+    ) in fake_gitlab.fork_source_project.invitations.calls
+    assert (
+        "update",
+        "student@example.edu.au",
+        {"access_level": 30},
+    ) in fake_gitlab.fork_source_project.invitations.calls

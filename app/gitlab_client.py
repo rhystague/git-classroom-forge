@@ -223,6 +223,112 @@ class GitLabClient:
 
         return results
 
+    def ensure_group(
+        self,
+        *,
+        full_path: str,
+        name: str,
+        parent_full_path: str | None = None,
+    ) -> GitLabGroupSummary:
+        client = self._make_client()
+        try:
+            return self._group_summary(client.groups.get(full_path))
+        except Exception:
+            pass
+
+        path = full_path.rsplit("/", maxsplit=1)[-1]
+        payload = {"name": name, "path": path}
+        if parent_full_path:
+            parent = client.groups.get(parent_full_path)
+            payload["parent_id"] = getattr(parent, "id")
+
+        group = client.groups.create(payload)
+        return self._group_summary(group)
+
+    def create_blank_project(
+        self,
+        *,
+        namespace_full_path: str,
+        name: str,
+        path: str,
+    ) -> GitLabProjectSummary:
+        client = self._make_client()
+        namespace = client.groups.get(namespace_full_path)
+        project = client.projects.create(
+            {
+                "name": name,
+                "path": path,
+                "namespace_id": getattr(namespace, "id"),
+            }
+        )
+        return self._project_summary(project)
+
+    def fork_project(
+        self,
+        *,
+        source_full_path: str,
+        namespace_full_path: str,
+        name: str,
+        path: str,
+    ) -> GitLabProjectSummary:
+        client = self._make_client()
+        source_project = client.projects.get(source_full_path)
+        namespace = client.groups.get(namespace_full_path)
+        fork = source_project.forks.create(
+            {
+                "namespace_id": getattr(namespace, "id"),
+                "name": name,
+                "path": path,
+            }
+        )
+        return self._project_summary(fork)
+
+    def add_project_member(
+        self,
+        *,
+        project_full_path: str,
+        user_id: int,
+        access_level: int,
+    ) -> None:
+        client = self._make_client()
+        project = client.projects.get(project_full_path)
+        project.members.create({"user_id": user_id, "access_level": access_level})
+
+    def update_project_member(
+        self,
+        *,
+        project_full_path: str,
+        user_id: int,
+        access_level: int,
+    ) -> None:
+        client = self._make_client()
+        project = client.projects.get(project_full_path)
+        member = project.members.get(user_id)
+        member.access_level = access_level
+        member.save()
+
+    def create_project_invitation(
+        self,
+        *,
+        project_full_path: str,
+        email: str,
+        access_level: int,
+    ) -> None:
+        client = self._make_client()
+        project = client.projects.get(project_full_path)
+        project.invitations.create({"email": email, "access_level": access_level})
+
+    def update_project_invitation(
+        self,
+        *,
+        project_full_path: str,
+        email: str,
+        access_level: int,
+    ) -> None:
+        client = self._make_client()
+        project = client.projects.get(project_full_path)
+        project.invitations.update(email, {"access_level": access_level})
+
     def _make_client(self):
         import gitlab
 

@@ -17,6 +17,7 @@ from app.gitlab_client import (
 )
 from app.membership import DEVELOPER_ACCESS_LEVEL, plan_project_memberships
 from app.validators import validate_gitlab_path_component, validate_project_rows
+from app.provisioner import DryRunSnapshotError, load_valid_dry_run_snapshot
 
 
 class GitLabReadModel(Protocol):

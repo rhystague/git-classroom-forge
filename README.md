@@ -3,8 +3,9 @@
 Class Git Forge is an internal Docker-hosted tool for helping authorised staff validate
 and provision GitLab assignment repositories at scale.
 
-The current base layer provides a Flask web app for validating CSV inputs. Destructive
-GitLab provisioning is intentionally not implemented yet.
+The app provides a Flask workflow for reviewing roster CSV inputs, running a
+non-destructive dry run, and then provisioning the reviewed GitLab groups, projects,
+forks, memberships, and invitations.
 
 ## Quick Start
 

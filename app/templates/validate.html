@@ -385,12 +385,155 @@
         background: #eef2f7;
         color: #1f2933;
       }
+
+      .result-section {
+        display: grid;
+        gap: 16px;
+      }
+
+      .result-heading {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+      }
+
+      .result-heading h2 {
+        margin: 0;
+      }
+
+      .status-chip {
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 4px 10px;
+      }
+
+      .status-chip.is-valid {
+        background: #dcfce7;
+        color: #14532d;
+      }
+
+      .status-chip.is-invalid {
+        background: #fee2e2;
+        color: #7f1d1d;
+      }
+
+      .result-summary {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      }
+
+      .result-metric {
+        background: #f8fafc;
+        border: 1px solid #d8dee8;
+        border-radius: 6px;
+        padding: 10px 12px;
+      }
+
+      .result-metric span {
+        color: #52606d;
+        display: block;
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      .result-metric strong {
+        display: block;
+        font-size: 1.05rem;
+        overflow-wrap: anywhere;
+      }
+
+      .result-column {
+        min-width: 90px;
+      }
+
+      .provision-action {
+        border-top: 1px solid #d8dee8;
+        margin-top: 4px;
+        padding-top: 16px;
+      }
     </style>
   </head>
   <body>
+    {% macro status_chip(valid) -%}
+      <span class="status-chip {{ 'is-valid' if valid else 'is-invalid' }}">{{ "Valid" if valid else "Invalid" }}</span>
+    {%- endmacro %}
+
+    {% macro result_summary(report) -%}
+      <div class="result-summary">
+        {% if report.run_id %}
+          <div class="result-metric">
+            <span>Run ID</span>
+            <strong>{{ report.run_id }}</strong>
+          </div>
+        {% endif %}
+        {% if report.source_run_id %}
+          <div class="result-metric">
+            <span>Source dry run</span>
+            <strong>{{ report.source_run_id }}</strong>
+          </div>
+        {% endif %}
+        <div class="result-metric">
+          <span>Status</span>
+          <strong>{{ "valid" if report.valid else "invalid" }}</strong>
+        </div>
+        <div class="result-metric">
+          <span>Projects</span>
+          <strong>{{ report.project_count }}</strong>
+        </div>
+        <div class="result-metric">
+          <span>Student memberships</span>
+          <strong>{{ report.student_count }}</strong>
+        </div>
+      </div>
+    {%- endmacro %}
+
+    {% macro membership_actions(report) -%}
+      <h3>Membership actions</h3>
+      {% for project in report.projects %}
+        <h4>{{ project.project_name }} ({{ project.full_path }})</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Student ID</th>
+              <th>Email</th>
+              <th>User state</th>
+              <th>Access source</th>
+              <th>Current access</th>
+              <th>Action</th>
+              {% if project.membership_actions and project.membership_actions[0].result %}
+                <th class="result-column">Result</th>
+              {% endif %}
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for action in project.membership_actions %}
+              <tr>
+                <td>{{ action.student_id or "-" }}</td>
+                <td>{{ action.email or "-" }}</td>
+                <td>{{ action.user_state or ("exists" if action.user_exists else "missing") }}</td>
+                <td>{{ action.access_source or "-" }}</td>
+                <td>{{ action.current_access_level or "-" }}</td>
+                <td>{{ action.action_label }}</td>
+                {% if project.membership_actions and project.membership_actions[0].result %}
+                  <td>{{ action.result or "-" }}</td>
+                {% endif %}
+                <td>{{ action.provision_reason or action.provision_error or action.reason or "-" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endfor %}
+    {%- endmacro %}
+
     <main>
       <h1>Git Classroom Forge</h1>
-      <p>Validate GitLab course repository CSV files before provisioning.</p>
+      <p>Review rosters, validate a dry run, then provision GitLab course repositories.</p>
 
       {% if browse_error %}
         <section class="error">
@@ -585,22 +728,44 @@
       {% endif %}
 
       {% if result %}
-        <section>
-          <h2>Validation result</h2>
-          <p>Status: {{ "valid" if result.valid else "invalid" }}</p>
-          <p>Projects: {{ result.project_count }}</p>
-          <p>Student memberships: {{ result.student_count }}</p>
-          <pre>{{ result | tojson(indent=2) }}</pre>
+        <section class="result-section">
+          <div class="result-heading">
+            <h2>Validation result</h2>
+            {{ status_chip(result.valid) }}
+          </div>
+          {{ result_summary(result) }}
+          {% if result.errors %}
+            <h3>Errors</h3>
+            <ul class="status-list">
+              {% for item in result.errors %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          {% if result.warnings %}
+            <h3>Warnings</h3>
+            <ul class="status-list">
+              {% for item in result.warnings %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
         </section>
       {% endif %}
 
       {% if dry_run %}
-        <section>
-          <h2>Dry-run result</h2>
-          <p>Run ID: {{ dry_run.run_id }}</p>
-          <p>Status: {{ "valid" if dry_run.valid else "invalid" }}</p>
-          <p>Projects: {{ dry_run.project_count }}</p>
-          <p>Student memberships: {{ dry_run.student_count }}</p>
+        <section class="result-section">
+          <div class="result-heading">
+            <h2>Dry-run result</h2>
+            {{ status_chip(dry_run.valid) }}
+          </div>
+          {{ result_summary(dry_run) }}
+          {% if dry_run.valid %}
+            <form class="provision-action" action="/provision" method="post">
+              <input name="run_id" type="hidden" value="{{ dry_run.run_id }}">
+              <button id="provision_button" type="submit">Provision</button>
+            </form>
+          {% endif %}
           {% if dry_run.errors %}
             <h3>Errors</h3>
             <ul class="status-list">
@@ -617,36 +782,34 @@
               {% endfor %}
             </ul>
           {% endif %}
-          <h3>Membership actions</h3>
-          {% for project in dry_run.projects %}
-            <h4>{{ project.project_name }} ({{ project.full_path }})</h4>
-            <table>
-              <thead>
-                <tr>
-                  <th>Student ID</th>
-                  <th>Email</th>
-                  <th>User state</th>
-                  <th>Access source</th>
-                  <th>Current access</th>
-                  <th>Action</th>
-                  <th>Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for action in project.membership_actions %}
-                  <tr>
-                    <td>{{ action.student_id or "-" }}</td>
-                    <td>{{ action.email or "-" }}</td>
-                    <td>{{ action.user_state or ("exists" if action.user_exists else "missing") }}</td>
-                    <td>{{ action.access_source or "-" }}</td>
-                    <td>{{ action.current_access_level or "-" }}</td>
-                    <td>{{ action.action_label }}</td>
-                    <td>{{ action.reason }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          {% endfor %}
+          {{ membership_actions(dry_run) }}
+        </section>
+      {% endif %}
+
+      {% if provisioning %}
+        <section class="result-section">
+          <div class="result-heading">
+            <h2>Provisioning result</h2>
+            {{ status_chip(provisioning.valid) }}
+          </div>
+          {{ result_summary(provisioning) }}
+          {% if provisioning.errors %}
+            <h3>Errors</h3>
+            <ul class="status-list">
+              {% for item in provisioning.errors %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          {% if provisioning.warnings %}
+            <h3>Warnings</h3>
+            <ul class="status-list">
+              {% for item in provisioning.warnings %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          {{ membership_actions(provisioning) }}
         </section>
       {% endif %}
 

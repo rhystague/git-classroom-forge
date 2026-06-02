@@ -6,9 +6,19 @@ from flask import Blueprint, Response, abort, current_app, jsonify, render_templ
 
 from app.audit import write_audit_event
 from app.csv_parser import CsvParseError, parse_projects_csv
-from app.dry_run import DryRunSelection, build_dry_run_report, persist_dry_run_snapshot
+from app.dry_run import (
+    DryRunSelection,
+    DryRunSnapshotError,
+    build_dry_run_report,
+    load_valid_dry_run_snapshot,
+    persist_dry_run_snapshot,
+)
 from app.gitlab_client import GitLabClient
-from app.provisioner import build_validation_preview
+from app.provisioner import (
+    build_validation_preview,
+    persist_provisioning_report,
+    provision_from_dry_run,
+)
 from app.reports import validation_response
 from app.validators import validate_project_rows
 
@@ -252,9 +262,37 @@ def dry_run_upload():
     return _render_validate(dry_run=report, status=200 if report["valid"] else 422)
 
 
+@bp.post("/provision")
+def provision():
+    config = current_app.config["APP_CONFIG"]
+    if not config.gitlab_configured:
+        return _render_validate(
+            error="GITLAB_URL and GITLAB_TOKEN must be set before provisioning.",
+            status=503,
+        )
+
+    try:
+        dry_run = load_valid_dry_run_snapshot(
+            config.data_dir,
+            request.form.get("run_id", "").strip(),
+        )
+    except DryRunSnapshotError as exc:
+        return _render_validate(error=str(exc), status=400)
+
+    provisioning = provision_from_dry_run(dry_run, _gitlab_client())
+    persist_provisioning_report(config.data_dir, provisioning)
+    write_audit_event(config.data_dir, "provision", provisioning)
+    return _render_validate(
+        dry_run=dry_run,
+        provisioning=provisioning,
+        status=200 if provisioning["valid"] else 502,
+    )
+
+
 def _render_validate(
     result: dict[str, object] | None = None,
     dry_run: dict[str, object] | None = None,
+    provisioning: dict[str, object] | None = None,
     error: str | None = None,
     status: int = 200,
 ):
@@ -263,6 +301,7 @@ def _render_validate(
             "validate.html",
             result=result,
             dry_run=dry_run,
+            provisioning=provisioning,
             error=error,
             course_groups=[],
             browse_error=None,
