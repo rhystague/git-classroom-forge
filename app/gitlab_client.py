@@ -36,12 +36,28 @@ class GitLabProjectSummary:
 
 
 @dataclass(frozen=True)
+class GitLabProjectMember:
+    user_id: int
+    username: str
+    name: str | None
+    access_level: int
+    state: str | None = None
+
+
+@dataclass(frozen=True)
+class GitLabProjectInvitation:
+    email: str
+    access_level: int | None
+
+
+@dataclass(frozen=True)
 class GitLabUserLookup:
     username: str
     exists: bool
     ambiguous: bool
     id: int | None
     name: str | None
+    state: str | None = None
 
 
 @dataclass(frozen=True)
@@ -145,6 +161,30 @@ class GitLabClient:
             for project in group.projects.list(get_all=True)
         ]
 
+    def list_project_direct_members(self, full_path: str) -> list[GitLabProjectMember]:
+        client = self._make_client()
+        project = client.projects.get(full_path)
+        return [
+            self._project_member(member)
+            for member in project.members.list(get_all=True)
+        ]
+
+    def list_project_all_members(self, full_path: str) -> list[GitLabProjectMember]:
+        client = self._make_client()
+        project = client.projects.get(full_path)
+        return [
+            self._project_member(member)
+            for member in project.members_all.list(get_all=True)
+        ]
+
+    def list_project_invitations(self, full_path: str) -> list[GitLabProjectInvitation]:
+        client = self._make_client()
+        project = client.projects.get(full_path)
+        return [
+            self._project_invitation(invitation)
+            for invitation in project.invitations.list(get_all=True)
+        ]
+
     def lookup_users(self, usernames: tuple[str, ...]) -> dict[str, GitLabUserLookup]:
         client = self._make_client()
         results: dict[str, GitLabUserLookup] = {}
@@ -162,6 +202,7 @@ class GitLabClient:
                     ambiguous=False,
                     id=getattr(user, "id", None),
                     name=getattr(user, "name", None),
+                    state=getattr(user, "state", None),
                 )
             elif len(exact_matches) > 1:
                 results[username] = GitLabUserLookup(
@@ -222,6 +263,21 @@ class GitLabClient:
                 getattr(project, "full_path", getattr(project, "path", "")),
             ),
             web_url=getattr(project, "web_url", ""),
+        )
+
+    def _project_member(self, member) -> GitLabProjectMember:
+        return GitLabProjectMember(
+            user_id=getattr(member, "id", getattr(member, "user_id", None)),
+            username=getattr(member, "username", ""),
+            name=getattr(member, "name", None),
+            access_level=int(getattr(member, "access_level", 0)),
+            state=getattr(member, "state", None),
+        )
+
+    def _project_invitation(self, invitation) -> GitLabProjectInvitation:
+        return GitLabProjectInvitation(
+            email=getattr(invitation, "email", ""),
+            access_level=_optional_int_attr(invitation, "access_level"),
         )
 
 

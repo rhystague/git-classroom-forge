@@ -47,6 +47,17 @@ def test_validator_detects_duplicate_student_ids_across_projects():
     )
 
 
+def test_validator_requires_numeric_student_ids():
+    rows = [
+        ProjectCsvRow(project_path="team-01", project_name="Team 01", student_ids=["s22048668"]),
+    ]
+
+    report = validate_project_rows(rows)
+
+    assert report.valid is False
+    assert "Student ID s22048668 in project team-01 must contain digits only." in report.errors
+
+
 def test_validate_gitlab_path_component_rejects_unsafe_paths():
     errors = validate_gitlab_path_component("bad/path", "Offering path")
 

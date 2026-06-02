@@ -13,6 +13,7 @@ class AppConfig:
     app_host: str = "0.0.0.0"
     app_port: int = 8080
     data_dir: str = "/workspace/data"
+    student_email_domain: str = "student.university.edu.au"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "AppConfig":
@@ -24,6 +25,11 @@ class AppConfig:
             app_host=source.get("APP_HOST", "0.0.0.0").strip() or "0.0.0.0",
             app_port=int(source.get("APP_PORT", "8080")),
             data_dir=source.get("DATA_DIR", "/workspace/data").strip() or "/workspace/data",
+            student_email_domain=source.get(
+                "STUDENT_EMAIL_DOMAIN",
+                "student.university.edu.au",
+            ).strip()
+            or "student.university.edu.au",
         )
 
     def to_public_dict(self) -> dict[str, object]:
@@ -34,6 +40,7 @@ class AppConfig:
             "app_host": self.app_host,
             "app_port": self.app_port,
             "data_dir": self.data_dir,
+            "student_email_domain": self.student_email_domain,
         }
 
     @property

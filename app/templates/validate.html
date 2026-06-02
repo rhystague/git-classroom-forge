@@ -117,6 +117,26 @@
         border-radius: 4px;
       }
 
+      table {
+        border-collapse: collapse;
+        font-size: 0.92rem;
+        margin-top: 12px;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border: 1px solid #d8dee8;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+        word-break: break-word;
+      }
+
+      th {
+        background: #f1f5f9;
+      }
+
       .error {
         border-color: #b91c1c;
         color: #7f1d1d;
@@ -379,6 +399,7 @@
         </section>
       {% endif %}
 
+      {% if not dry_run %}
       <section id="course_step" class="step" data-step="course">
         <div class="step-header">
           <span class="step-number">1</span>
@@ -551,12 +572,10 @@
             <div class="full-width-action">
               <button id="dry_run_button" type="submit" disabled>Perform Dry Run</button>
             </div>
-            <div class="full-width-action">
-              <button id="provision_button" type="button" disabled title="Provisioning is intentionally unavailable until destructive GitLab actions are implemented.">Provision</button>
-            </div>
           </fieldset>
         </section>
       </form>
+      {% endif %}
 
       {% if error %}
         <section class="error">
@@ -598,10 +617,40 @@
               {% endfor %}
             </ul>
           {% endif %}
-          <pre>{{ dry_run | tojson(indent=2) }}</pre>
+          <h3>Membership actions</h3>
+          {% for project in dry_run.projects %}
+            <h4>{{ project.project_name }} ({{ project.full_path }})</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Student ID</th>
+                  <th>Email</th>
+                  <th>User state</th>
+                  <th>Access source</th>
+                  <th>Current access</th>
+                  <th>Action</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for action in project.membership_actions %}
+                  <tr>
+                    <td>{{ action.student_id or "-" }}</td>
+                    <td>{{ action.email or "-" }}</td>
+                    <td>{{ action.user_state or ("exists" if action.user_exists else "missing") }}</td>
+                    <td>{{ action.access_source or "-" }}</td>
+                    <td>{{ action.current_access_level or "-" }}</td>
+                    <td>{{ action.action_label }}</td>
+                    <td>{{ action.reason }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% endfor %}
         </section>
       {% endif %}
 
+      {% if not dry_run %}
       <script>
           const groupStatus = document.getElementById("group_status");
           const courseGroupList = document.getElementById("course_group_list");
@@ -1046,6 +1095,7 @@
           {% endif %}
           updateProgressiveWorkflow();
       </script>
+      {% endif %}
     </main>
   </body>
 </html>

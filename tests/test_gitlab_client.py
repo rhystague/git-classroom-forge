@@ -69,6 +69,43 @@ class FakeGitLab:
             path="python-starter",
             path_with_namespace="professional-experience/examples/python-starter",
             web_url="https://gitlab.example.edu.au/professional-experience/examples/python-starter",
+            members=FakeManager(
+                [
+                    FakeObject(
+                        id=100,
+                        username="22048668",
+                        name="Student One",
+                        access_level=30,
+                        state="active",
+                    )
+                ]
+            ),
+            members_all=FakeManager(
+                [
+                    FakeObject(
+                        id=100,
+                        username="22048668",
+                        name="Student One",
+                        access_level=30,
+                        state="active",
+                    ),
+                    FakeObject(
+                        id=101,
+                        username="22049321",
+                        name="Student Two",
+                        access_level=30,
+                        state="active",
+                    ),
+                ]
+            ),
+            invitations=FakeManager(
+                [
+                    FakeObject(
+                        email="22051234@student.university.edu.au",
+                        access_level=30,
+                    )
+                ]
+            ),
         )
         offering = FakeObject(
             id=2,
@@ -185,6 +222,41 @@ def test_gitlab_client_looks_up_users_by_exact_username(monkeypatch):
     assert users["22048668"].exists is True
     assert users["22048668"].name == "Student One"
     assert users["22049321"].exists is False
+
+
+def test_gitlab_client_lists_project_direct_members(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    members = client.list_project_direct_members("professional-experience/examples/python-starter")
+
+    assert members[0].username == "22048668"
+    assert members[0].access_level == 30
+    assert fake_gitlab.fork_source_project.members.calls == [{"get_all": True}]
+
+
+def test_gitlab_client_lists_project_all_members(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    members = client.list_project_all_members("professional-experience/examples/python-starter")
+
+    assert [member.username for member in members] == ["22048668", "22049321"]
+    assert fake_gitlab.fork_source_project.members_all.calls == [{"get_all": True}]
+
+
+def test_gitlab_client_lists_project_invitations(monkeypatch):
+    client = GitLabClient(AppConfig.from_env({}))
+    fake_gitlab = FakeGitLab()
+    monkeypatch.setattr(client, "_make_client", lambda: fake_gitlab)
+
+    invitations = client.list_project_invitations("professional-experience/examples/python-starter")
+
+    assert invitations[0].email == "22051234@student.university.edu.au"
+    assert invitations[0].access_level == 30
+    assert fake_gitlab.fork_source_project.invitations.calls == [{"get_all": True}]
 
 
 def test_gitlab_client_sets_short_api_timeout(monkeypatch):

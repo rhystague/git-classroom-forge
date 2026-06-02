@@ -15,6 +15,17 @@ def test_config_loads_defaults_and_gitlab_settings():
     assert config.app_host == "0.0.0.0"
     assert config.app_port == 8080
     assert config.data_dir == "/workspace/data"
+    assert config.student_email_domain == "student.university.edu.au"
+
+
+def test_config_allows_student_email_domain_override():
+    config = AppConfig.from_env(
+        {
+            "STUDENT_EMAIL_DOMAIN": "students.example.edu",
+        }
+    )
+
+    assert config.student_email_domain == "students.example.edu"
 
 
 def test_config_redacts_token():

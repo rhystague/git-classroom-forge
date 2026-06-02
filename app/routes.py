@@ -207,7 +207,7 @@ def validate_upload():
 
     try:
         content = uploaded.read().decode("utf-8-sig")
-        rows = parse_projects_csv(content)
+        rows = parse_projects_csv(content, _assessment_mode_from_form())
     except UnicodeDecodeError:
         return _render_validate(error="CSV file must be UTF-8 text.", status=400)
     except CsvParseError as exc:
@@ -234,7 +234,7 @@ def dry_run_upload():
         )
     try:
         content = uploaded.read().decode("utf-8-sig")
-        rows = parse_projects_csv(content)
+        rows = parse_projects_csv(content, _assessment_mode_from_form())
     except UnicodeDecodeError:
         return _render_validate(error="CSV file must be UTF-8 text.", status=400)
     except CsvParseError as exc:
@@ -245,6 +245,7 @@ def dry_run_upload():
         rows=rows,
         selection=selection,
         gitlab=_gitlab_client(),
+        student_email_domain=config.student_email_domain,
     )
     persist_dry_run_snapshot(config.data_dir, report)
     write_audit_event(config.data_dir, "dry-run", report)
@@ -313,6 +314,10 @@ def _dry_run_selection_from_form() -> DryRunSelection:
         base_repository_mode=request.form.get("base_repository_mode", "").strip(),
         base_repository_full_path=request.form.get("base_repository_full_path", "").strip().strip("/"),
     )
+
+
+def _assessment_mode_from_form() -> str:
+    return request.form.get("assessment_mode", "").strip()
 
 
 def _split_existing_offering_path(

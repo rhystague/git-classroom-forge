@@ -49,6 +49,10 @@ def validate_project_rows(rows: list[ProjectCsvRow]) -> ValidationReport:
                 errors.append(f"Duplicate student ID {student_id} in project {row.project_path}")
             else:
                 seen_students.add(student_id)
+            if student_id and not student_id.isdigit():
+                errors.append(
+                    f"Student ID {student_id} in project {row.project_path} must contain digits only."
+                )
 
         for student_id in seen_students:
             student_projects.setdefault(student_id, []).append(row.project_path or "[missing]")

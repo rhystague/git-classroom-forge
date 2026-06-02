@@ -8,7 +8,14 @@ from pathlib import Path
 from typing import Protocol
 
 from app.csv_parser import ProjectCsvRow
-from app.gitlab_client import GitLabGroupSummary, GitLabProjectSummary, GitLabUserLookup
+from app.gitlab_client import (
+    GitLabGroupSummary,
+    GitLabProjectInvitation,
+    GitLabProjectMember,
+    GitLabProjectSummary,
+    GitLabUserLookup,
+)
+from app.membership import DEVELOPER_ACCESS_LEVEL, plan_project_memberships
 from app.validators import validate_gitlab_path_component, validate_project_rows
 
 
@@ -23,6 +30,15 @@ class GitLabReadModel(Protocol):
         ...
 
     def lookup_users(self, usernames: tuple[str, ...]) -> dict[str, GitLabUserLookup]:
+        ...
+
+    def list_project_direct_members(self, full_path: str) -> list[GitLabProjectMember]:
+        ...
+
+    def list_project_all_members(self, full_path: str) -> list[GitLabProjectMember]:
+        ...
+
+    def list_project_invitations(self, full_path: str) -> list[GitLabProjectInvitation]:
         ...
 
 
@@ -49,6 +65,7 @@ def build_dry_run_report(
     rows: list[ProjectCsvRow],
     selection: DryRunSelection,
     gitlab: GitLabReadModel,
+    student_email_domain: str = "student.university.edu.au",
 ) -> dict[str, object]:
     validation = validate_project_rows(rows)
     errors = list(validation.errors)
@@ -76,23 +93,17 @@ def build_dry_run_report(
                     for project in gitlab.list_group_projects(selection.assessment_full_path)
                 }
 
-    student_usernames = tuple(sorted({student_id for row in rows for student_id in row.student_ids}))
-    student_lookups = gitlab.lookup_users(student_usernames) if student_usernames else {}
-    for username in student_usernames:
-        lookup = student_lookups.get(
-            username,
-            GitLabUserLookup(
-                username=username,
-                exists=False,
-                ambiguous=False,
-                id=None,
-                name=None,
-            ),
+    student_usernames = tuple(
+        sorted(
+            {
+                student_id
+                for row in rows
+                for student_id in row.student_ids
+                if student_id.isdigit()
+            }
         )
-        if lookup.ambiguous:
-            errors.append(f"GitLab user lookup is ambiguous for student ID {username}.")
-        elif not lookup.exists:
-            errors.append(f"GitLab user not found for student ID {username}.")
+    )
+    student_lookups = gitlab.lookup_users(student_usernames) if student_usernames else {}
 
     requested_project_paths = {row.project_path for row in rows}
     extra_project_paths = sorted(set(existing_projects) - requested_project_paths)
@@ -100,6 +111,21 @@ def build_dry_run_report(
         warnings.append(
             f"Existing GitLab project not present in CSV will be left unchanged: {project_path}"
         )
+
+    projects = []
+    for row in rows:
+        existing_project = existing_projects.get(row.project_path)
+        project_plan, membership_errors, membership_warnings = _project_plan(
+            selection.assessment_full_path,
+            row,
+            existing_project,
+            student_lookups,
+            gitlab,
+            student_email_domain,
+        )
+        projects.append(project_plan)
+        errors.extend(membership_errors)
+        warnings.extend(membership_warnings)
 
     return {
         "run_id": _new_run_id(),
@@ -130,10 +156,12 @@ def build_dry_run_report(
             ),
         },
         "base_repository": base_repository,
-        "projects": [
-            _project_plan(selection.assessment_full_path, row, existing_projects.get(row.project_path))
-            for row in rows
-        ],
+        "membership": {
+            "student_email_domain": student_email_domain,
+            "target_access_level": DEVELOPER_ACCESS_LEVEL,
+            "target_access_name": "Developer",
+        },
+        "projects": projects,
         "students": {
             username: asdict(
                 student_lookups.get(
@@ -256,16 +284,53 @@ def _project_plan(
     assessment_full_path: str,
     row: ProjectCsvRow,
     existing_project: GitLabProjectSummary | None,
-) -> dict[str, object]:
-    return {
+    student_lookups: dict[str, GitLabUserLookup],
+    gitlab: GitLabReadModel,
+    student_email_domain: str,
+) -> tuple[dict[str, object], list[str], list[str]]:
+    full_path = f"{assessment_full_path}/{row.project_path}"
+    if not row.student_ids:
+        action = "reuse" if existing_project else "skip_empty_project"
+    else:
+        action = "reuse" if existing_project else "create_later"
+
+    direct_members: list[GitLabProjectMember] = []
+    all_members: list[GitLabProjectMember] = []
+    invitations: list[GitLabProjectInvitation] = []
+    inspection_errors: list[str] = []
+
+    if existing_project is not None:
+        try:
+            direct_members = gitlab.list_project_direct_members(full_path)
+            all_members = gitlab.list_project_all_members(full_path)
+            invitations = gitlab.list_project_invitations(full_path)
+        except Exception as exc:
+            inspection_errors.append(
+                f"GitLab membership inspection failed for project {full_path}: {type(exc).__name__}"
+            )
+
+    membership_plan = plan_project_memberships(
+        student_ids=row.student_ids,
+        project=existing_project,
+        student_lookups=student_lookups,
+        direct_members=direct_members,
+        all_members=all_members,
+        invitations=invitations,
+        student_email_domain=student_email_domain,
+    )
+    membership_errors = list(membership_plan["errors"])
+    membership_errors.extend(inspection_errors)
+    project_plan = {
         "project_path": row.project_path,
         "project_name": row.project_name,
         "student_ids": row.student_ids,
-        "full_path": f"{assessment_full_path}/{row.project_path}",
+        "full_path": full_path,
         "exists": existing_project is not None,
-        "action": "reuse" if existing_project else "create_later",
+        "action": action,
         "gitlab": asdict(existing_project) if existing_project else None,
+        "membership_actions": membership_plan["actions"],
     }
+    return project_plan, membership_errors, list(membership_plan["warnings"])
 
 
 def _new_run_id() -> str:

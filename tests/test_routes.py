@@ -1,3 +1,4 @@
+import json
 from io import BytesIO
 
 from app.main import create_app
@@ -96,6 +97,15 @@ class FakeRouteGitLabClient:
     def list_group_projects(self, full_path):
         return []
 
+    def list_project_direct_members(self, full_path):
+        return []
+
+    def list_project_all_members(self, full_path):
+        return []
+
+    def list_project_invitations(self, full_path):
+        return []
+
     def lookup_users(self, usernames):
         return {
             username: GitLabUserLookup(
@@ -104,6 +114,7 @@ class FakeRouteGitLabClient:
                 ambiguous=False,
                 id=100,
                 name=f"Student {username}",
+                state="active",
             )
             for username in usernames
         }
@@ -388,7 +399,8 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
     assert b'id="review_provision"' not in response.data
     assert b"Review Provision" not in response.data
     assert b"Perform Dry Run" in response.data
-    assert b"Provision" in response.data
+    assert b'id="provision_button"' not in response.data
+    assert b"Provisioning is intentionally unavailable" not in response.data
     assert b'replace(/([a-z])([0-9])/g, "$1-$2")' in response.data
     assert b"offeringDerivedPath.textContent" in response.data
     assert b"assessmentDerivedPath.textContent" in response.data
@@ -467,7 +479,7 @@ def test_dry_run_route_persists_snapshot_and_renders_result(tmp_path):
             "GITLAB_CLIENT": FakeRouteGitLabClient(),
         }
     )
-    csv_content = b"""project_path,project_name,student_ids
+    csv_content = b"""project_path,project_name,student_id
 team-01,Team 01,22048668
 team-01,Team 01,22049321
 """
@@ -481,6 +493,7 @@ team-01,Team 01,22049321
             "assessment_path": "pa2621",
             "assessment_name": "PA2621",
             "base_repository_mode": "blank",
+            "assessment_mode": "group",
             "csv_file": (BytesIO(csv_content), "projects.csv"),
         },
         content_type="multipart/form-data",
@@ -488,8 +501,27 @@ team-01,Team 01,22049321
 
     assert response.status_code == 200
     assert b"Dry-run result" in response.data
+    assert b"Membership actions" in response.data
+    assert b'data-step="course"' not in response.data
+    assert b"Select your course" not in response.data
+    assert b"Assessment Provisioning" not in response.data
+    assert b"Perform Dry Run" not in response.data
+    assert b"<pre>" not in response.data
+    assert b'"mode": "dry-run"' not in response.data
+    assert b'id="provision_button"' not in response.data
+    assert response.data.count(b"Team 01 (new-course") == 0
+    assert response.data.count(b"Team 01 (professional-experience/autumn-2026/pa2621/team-01)") == 1
+    assert b"22048668@student.university.edu.au" in response.data
+    assert b"22049321@student.university.edu.au" in response.data
+    assert b"Add member after project create" in response.data
     report_files = list((tmp_path / "reports").glob("*-dry-run.json"))
     assert len(report_files) == 1
+    report = json.loads(report_files[0].read_text(encoding="utf-8"))
+    assert report["project_count"] == 1
+    assert report["student_count"] == 2
+    assert len(report["projects"]) == 1
+    assert len(report["projects"][0]["membership_actions"]) == 2
+    assert report["projects"][0]["membership_actions"][0]["action"] == "add_member_after_project_create"
 
 
 def test_dry_run_route_allows_new_course_path(tmp_path):
@@ -506,7 +538,7 @@ def test_dry_run_route_allows_new_course_path(tmp_path):
             "GITLAB_CLIENT": FakeRouteGitLabClient(),
         }
     )
-    csv_content = b"""project_path,project_name,student_ids
+    csv_content = b"""project_path,project_name,student_id
 team-01,Team 01,22048668
 """
 
@@ -517,6 +549,7 @@ team-01,Team 01,22048668
             "offering_path": "autumn-2026",
             "assessment_path": "pa2621",
             "base_repository_mode": "blank",
+            "assessment_mode": "group",
             "csv_file": (BytesIO(csv_content), "projects.csv"),
         },
         content_type="multipart/form-data",
@@ -537,7 +570,42 @@ def test_dry_run_route_requires_gitlab_configuration(tmp_path):
             ),
         }
     )
-    csv_content = b"""project_path,project_name,student_ids
+    csv_content = b"""project_path,project_name,student_id
+team-01,Team 01,22048668
+"""
+
+    response = app.test_client().post(
+        "/dry-run",
+        data={
+            "parent_group_path": "professional-experience",
+            "offering_path": "autumn-2026",
+            "assessment_path": "pa2621",
+            "base_repository_mode": "blank",
+            "assessment_mode": "group",
+            "csv_file": (BytesIO(csv_content), "projects.csv"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 503
+    assert b"GITLAB_URL and GITLAB_TOKEN must be set before dry-run validation." in response.data
+
+
+def test_dry_run_route_requires_assessment_mode(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env(
+                {
+                    "DATA_DIR": str(tmp_path),
+                    "GITLAB_URL": "https://gitlab.example.edu.au",
+                    "GITLAB_TOKEN": "secret-token",
+                }
+            ),
+            "GITLAB_CLIENT": FakeRouteGitLabClient(),
+        }
+    )
+    csv_content = b"""project_path,project_name,student_id
 team-01,Team 01,22048668
 """
 
@@ -553,5 +621,26 @@ team-01,Team 01,22048668
         content_type="multipart/form-data",
     )
 
-    assert response.status_code == 503
-    assert b"GITLAB_URL and GITLAB_TOKEN must be set before dry-run validation." in response.data
+    assert response.status_code == 400
+    assert b"Assessment mode is required." in response.data
+
+
+def test_validate_route_requires_assessment_mode(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "APP_CONFIG": AppConfig.from_env({"DATA_DIR": str(tmp_path)}),
+        }
+    )
+    csv_content = b"""project_path,project_name,student_id
+team-01,Team 01,22048668
+"""
+
+    response = app.test_client().post(
+        "/validate",
+        data={"csv_file": (BytesIO(csv_content), "projects.csv")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert b"Assessment mode is required." in response.data

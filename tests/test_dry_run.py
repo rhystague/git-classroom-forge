@@ -70,6 +70,7 @@ class FakeGitLabReadModel:
                 ambiguous=False,
                 id=100,
                 name="Student One",
+                state="active",
             ),
             "22049321": GitLabUserLookup(
                 username="22049321",
@@ -77,6 +78,7 @@ class FakeGitLabReadModel:
                 ambiguous=False,
                 id=None,
                 name=None,
+                state=None,
             ),
         }
 
@@ -94,8 +96,17 @@ class FakeGitLabReadModel:
     def lookup_users(self, usernames):
         return {username: self.users[username] for username in usernames}
 
+    def list_project_direct_members(self, full_path):
+        return []
 
-def test_build_dry_run_report_marks_reused_projects_and_missing_users():
+    def list_project_all_members(self, full_path):
+        return []
+
+    def list_project_invitations(self, full_path):
+        return []
+
+
+def test_build_dry_run_report_marks_reused_projects_and_missing_users_as_invites():
     rows = [
         ProjectCsvRow(
             project_path="team-01",
@@ -120,7 +131,7 @@ def test_build_dry_run_report_marks_reused_projects_and_missing_users():
     )
 
     assert report["mode"] == "dry-run"
-    assert report["valid"] is False
+    assert report["valid"] is True
     assert report["target"]["offering"]["action"] == "reuse"
     assert report["target"]["assessment"]["action"] == "reuse"
     assert report["base_repository"] == {
@@ -134,7 +145,8 @@ def test_build_dry_run_report_marks_reused_projects_and_missing_users():
     assert report["projects"][0]["exists"] is True
     assert report["students"]["22048668"]["exists"] is True
     assert report["students"]["22049321"]["exists"] is False
-    assert "GitLab user not found for student ID 22049321." in report["errors"]
+    assert report["projects"][0]["membership_actions"][0]["action"] == "add_member"
+    assert report["projects"][0]["membership_actions"][1]["action"] == "create_invite"
 
 
 def test_build_dry_run_report_allows_new_parent_group_path():
