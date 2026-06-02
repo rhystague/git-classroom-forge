@@ -21,12 +21,4 @@ env/
 # Docker local state
 .docker/local.env
 
-# Generated app state
-data/*
-!data/.gitkeep
-!data/uploads/
-!data/uploads/.gitkeep
-!data/reports/
-!data/reports/.gitkeep
-!data/logs/
-!data/logs/.gitkeep
+
