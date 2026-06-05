@@ -1,5 +1,7 @@
 import json
+import re
 from io import BytesIO
+from pathlib import Path
 
 from app.main import create_app
 from app.config import AppConfig
@@ -36,6 +38,7 @@ def test_index_renders_provider_landing_tiles(tmp_path):
     response = app.test_client().get("/")
 
     assert response.status_code == 200
+    assert b'href="/static/css/app.css"' in response.data
     assert b"Git Classroom Forge" in response.data
     assert b"GitLab Provision" in response.data
     assert b'href="/gitlab-provision"' in response.data
@@ -58,6 +61,7 @@ def test_gitlab_provision_explanation_links_to_validate(tmp_path):
     response = app.test_client().get("/gitlab-provision")
 
     assert response.status_code == 200
+    assert b'href="/static/css/app.css"' in response.data
     assert b"GitLab Assessment Provisioning" in response.data
     assert b"How assessments will be generated" in response.data
     assert b"Choose a course" in response.data
@@ -413,14 +417,9 @@ def test_validate_form_does_not_block_on_group_browse(tmp_path):
     assert b"selected_course_display" in response.data
     assert b"GitLab activity" not in response.data
     assert b"View live GitLab group data as JSON" not in response.data
-    assert b"course-select" in response.data
-    assert b"selectExistingCourse(course.parent.full_path" in response.data
-    assert b"function fetchJson" in response.data
-    assert b"AbortController" in response.data
-    assert b"loadOfferings" in response.data
-    assert b"loadAssessments" in response.data
-    assert b"replace(/^\\\\/+|\\\\/+$/g" not in response.data
-    assert b"replace(/^\\/+|\\/+$/g" in response.data
+    assert b'href="/static/css/app.css"' in response.data
+    assert b'src="/static/js/validate-workflow.js"' in response.data
+    assert b'data-gitlab-configured="true"' in response.data
     assert gitlab.browse_calls == 0
 
 
@@ -459,8 +458,8 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
         b"Review rosters, validate a dry run, then provision GitLab course repositories."
     ) in response.data
     assert b"Choose an existing course or create a new course path." not in response.data
-    assert b"#A71D2A" in response.data
-    assert b"#14532d" in response.data
+    assert b'href="/static/css/app.css"' in response.data
+    assert b'src="/static/js/validate-workflow.js"' in response.data
     assert b'class="assessment-flow"' in response.data
     assert b'class="assessment-field-group"' in response.data
     assert b'<div class="grid">' not in response.data
@@ -488,7 +487,6 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
     assert b"Fork repository" in response.data
     assert b"Select repository to fork" in response.data
     assert b"Template repository" not in response.data
-    assert b"loadCourseProjects" in response.data
     assert b"Select assessment type" in response.data
     assert b'class="choice-stack assessment-mode-choices"' in response.data
     assert b"The group name from the CSV will be the project/repository name." in response.data
@@ -497,7 +495,6 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
         b"this assessment."
     ) in response.data
     assert b'id="provision_summary" class="summary-selection-list"' in response.data
-    assert b"className = \"summary-value\"" in response.data
     assert b'class="summary-callout"' in response.data
     assert b'class="info-icon"' in response.data
     assert b"Select Student Roster" in response.data
@@ -509,10 +506,6 @@ def test_validate_form_renders_progressive_workflow_sections(tmp_path):
     assert b"Perform Dry Run" in response.data
     assert b'id="provision_button"' not in response.data
     assert b"Provisioning is intentionally unavailable" not in response.data
-    assert b'replace(/([a-z])([0-9])/g, "$1-$2")' in response.data
-    assert b"offeringDerivedPath.textContent" in response.data
-    assert b"assessmentDerivedPath.textContent" in response.data
-    assert b"updateProgressiveWorkflow" in response.data
 
 
 def test_sample_group_csv_download_uses_group_project_format(tmp_path):
@@ -674,12 +667,22 @@ team-01,Team 01,22048668
     assert b'id="provision_form"' in response.data
     assert b'id="provision_button_label"' in response.data
     assert b'id="provision_button_spinner"' in response.data
-    assert b".spinner.hidden" in response.data
     assert b'id="provision_progress"' in response.data
     assert b"Provisioning..." in response.data
     assert b'aria-live="polite"' in response.data
-    assert b"addEventListener(\"submit\"" in response.data
+    assert b'href="/static/css/app.css"' in response.data
+    assert b'src="/static/js/provision-submit.js"' in response.data
     assert b'action="/provision"' in response.data
+
+
+def test_templates_use_external_static_assets():
+    template_root = Path("app/templates")
+    inline_script = re.compile(r"<script(?![^>]*\bsrc=)[^>]*>", re.IGNORECASE)
+
+    for template in template_root.glob("*.html"):
+        content = template.read_text(encoding="utf-8")
+        assert "<style" not in content, f"{template} should not contain inline styles"
+        assert not inline_script.search(content), f"{template} should not contain inline scripts"
 
 
 def test_invalid_dry_run_renders_invalid_chip_without_provision_button(tmp_path):
